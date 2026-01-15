@@ -319,10 +319,9 @@ Based on comprehensive testing, here's how different LLM models perform with thi
 
 | Model              | Performance | Query Accuracy | Complex Reasoning | Cost Efficiency | Recommendation |
 |--------------------|-------------|----------------|-------------------|-----------------|----------------|
-| **Gemini-3-flash** | Excellent | Excellent | Excellent | Good | **Recommended** |
-| **GLM-4.7**        | Very Good | Very Good | Excellent | Excellent | **Cost-Effective** |
-| **GPT-4.1-mini**   | Good | Fair | Fair | Very Good | **Budget Option** |
-| **GPT-4o-mini**    | Fair | Limited | Limited | Excellent | **Basic Use Only** |
+| **Gemini-3-flash(openrouter)** | Excellent | Excellent | Excellent | Good | **Recommended** |
+| **GLM-4.6**        | Very Good | Very Good | Excellent | Excellent | **Cost-Effective** |
+| **Kimi-k2**   | Good | Fair | Fair | Very Good | **Cost-Effective** |
 
 ### Recommendation Guidelines
 
