@@ -1,7 +1,9 @@
-import {GraphQLSchema, buildClientSchema, buildSchema, parse, validate} from 'graphql';
-import type {IntrospectionQuery} from 'graphql';
+// Copyright 2020-2025 SubQuery Pte Ltd authors & contributors
+// SPDX-License-Identifier: GPL-3.0
+
+import {GraphQLSchema, buildClientSchema, parse, validate, type IntrospectionQuery} from 'graphql';
 import {type Logger} from 'pino';
-import type { GraphQLProjectConfig, GraphQLProjectConfigInput } from "./types.js";
+import type {GraphQLProjectConfig} from './types.js';
 
 // // Create logger for GraphQL service operations
 // const logger = getLogger('graphql-service');
@@ -10,7 +12,7 @@ async function fetchJSON(
   endpoint: string,
   body: Record<string, unknown>,
   headers: Record<string, string>,
-  timeoutMs: number = 30000
+  timeoutMs = 30000
 ) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -19,14 +21,14 @@ async function fetchJSON(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...headers
+        ...headers,
       },
       body: JSON.stringify(body),
-      signal: controller.signal
+      signal: controller.signal,
     });
 
     const text = await response.text();
-    let data: any;
+    let data: unknown;
     try {
       data = JSON.parse(text);
     } catch {
@@ -57,14 +59,8 @@ async function secureFetch(
     maxContentLength?: number;
     validateRedirect?: (url: string) => void;
   }
-): Promise<any> {
-  const {
-    headers,
-    timeoutMs = 10000,
-    maxRedirects = 3,
-    maxContentLength = 10 * 1024 * 1024, // 10MB
-    validateRedirect
-  } = options;
+): Promise<unknown> {
+  const {headers, maxContentLength = 10 * 1024 * 1024, maxRedirects = 3, timeoutMs = 10000, validateRedirect} = options;
 
   let redirectCount = 0;
   let currentUrl = endpoint;
@@ -78,7 +74,7 @@ async function secureFetch(
         method: 'POST',
         headers,
         body: JSON.stringify(body),
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       // Handle redirects manually if needed
@@ -88,7 +84,10 @@ async function secureFetch(
           throw new Error(`Too many redirects (max: ${maxRedirects})`);
         }
 
-        const redirectUrl = response.headers.get('Location')!;
+        const redirectUrl = response.headers.get('Location');
+        if (!redirectUrl) {
+          throw new Error('Redirect location header is missing');
+        }
         const absoluteUrl = new URL(redirectUrl, currentUrl).toString();
 
         // Validate redirect security
@@ -116,12 +115,12 @@ async function secureFetch(
       const chunks: Uint8Array[] = [];
 
       while (true) {
-        const { done, value } = await reader.read();
+        const {done, value} = await reader.read();
         if (done) break;
 
         receivedLength += value.length;
         if (receivedLength > maxContentLength) {
-          reader.cancel();
+          void reader.cancel();
           throw new Error(`Response too large: ${receivedLength} bytes (max: ${maxContentLength})`);
         }
 
@@ -137,7 +136,7 @@ async function secureFetch(
       }
 
       const text = new TextDecoder().decode(responseBody);
-      let data: any;
+      let data: unknown;
       try {
         data = JSON.parse(text);
       } catch {
@@ -154,13 +153,17 @@ async function secureFetch(
   } finally {
     clearTimeout(timer);
   }
+  return undefined;
 }
-
 
 export class GraphQLService {
   private schemaCache = new Map<string, GraphQLSchema>();
 
-  constructor(private readonly config: GraphQLProjectConfig, private readonly allowLocalhost = true, private readonly logger?: Logger) {}
+  constructor(
+    private readonly config: GraphQLProjectConfig,
+    private readonly allowLocalhost = true,
+    private readonly logger?: Logger
+  ) {}
 
   private buildHeaders(_headers?: Record<string, string>): Record<string, string> {
     const headers: Record<string, string> = {};
@@ -203,29 +206,26 @@ export class GraphQLService {
     }
 
     try {
-      const data = await fetchJSON(
-        this.config.endpoint,
-        {query: INTROSPECTION_QUERY},
-        this.buildHeaders(),
-      ) as {data: IntrospectionQuery};
+      const data = (await fetchJSON(this.config.endpoint, {query: INTROSPECTION_QUERY}, this.buildHeaders())) as {
+        data: IntrospectionQuery;
+      };
 
       return data.data;
     } catch (error) {
-      this.logger?.warn({
-        endpoint: this.config.endpoint,
-        error: error instanceof Error ? error.message : String(error),
-        errorType: 'introspection_fetch_failed'
-      }, 'Failed to fetch introspection schema');
+      this.logger?.warn(
+        {
+          endpoint: this.config.endpoint,
+          error: error instanceof Error ? error.message : String(error),
+          errorType: 'introspection_fetch_failed',
+        },
+        'Failed to fetch introspection schema'
+      );
       throw error;
     }
   }
 
   async execute(query: string, variables?: Record<string, unknown>): Promise<any> {
-    return await fetchJSON(
-      this.config.endpoint,
-      variables ? {query, variables} : {query},
-      this.buildHeaders()
-    );
+    return fetchJSON(this.config.endpoint, variables ? {query, variables} : {query}, this.buildHeaders());
   }
 
   async validate(query: string): Promise<string[]> {
@@ -253,12 +253,11 @@ export class GraphQLService {
   /**
    * Fetches CID from GraphQL endpoint with caching
    * @param endpoint - GraphQL endpoint URL
-   * @param cacheTtl - Cache time-to-live in seconds (default: 7 days)
    * @returns CID string or empty string if not found
    */
   async fetchCidFromEndpoint(
     endpoint: string,
-    cacheTtl: number = 604800, // 7 days
+    cacheTtl = 604800 // 7 days
   ): Promise<string> {
     try {
       // 1. URL security validation
@@ -291,7 +290,7 @@ export class GraphQLService {
             timeoutMs: 10000,
             maxRedirects: 3,
             maxContentLength: 10 * 1024 * 1024,
-            validateRedirect: (url) => this.validateEndpointSecurity(url)
+            validateRedirect: (url) => this.validateEndpointSecurity(url),
           }
         );
 
@@ -299,15 +298,11 @@ export class GraphQLService {
         cid = deployments ? Object.values(deployments).pop() : undefined;
 
         if (cid) {
-          this.logger?.info(
-            `Successfully fetched CID from _metadata.deployments: ${cid}`
-          );
+          this.logger?.info(`Successfully fetched CID from _metadata.deployments: ${cid}`);
         }
       } catch (error) {
         this.logger?.debug(
-          `Failed to fetch CID from _metadata.deployments: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`
+          `Failed to fetch CID from _metadata.deployments: ${error instanceof Error ? error.message : 'Unknown error'}`
         );
       }
 
@@ -328,7 +323,7 @@ export class GraphQLService {
               timeoutMs: 10000,
               maxRedirects: 3,
               maxContentLength: 10 * 1024 * 1024,
-              validateRedirect: (url) => this.validateEndpointSecurity(url)
+              validateRedirect: (url) => this.validateEndpointSecurity(url),
             }
           );
 
@@ -339,9 +334,7 @@ export class GraphQLService {
           }
         } catch (error) {
           this.logger?.debug(
-            `Failed to fetch CID from _meta.deployment: ${
-              error instanceof Error ? error.message : "Unknown error"
-            }`
+            `Failed to fetch CID from _meta.deployment: ${error instanceof Error ? error.message : 'Unknown error'}`
           );
         }
       }
@@ -351,25 +344,23 @@ export class GraphQLService {
         this.logger?.warn(
           `No valid CID found for endpoint: ${endpoint} using both _metadata.deployments and _meta.deployment`
         );
-        return "";
+        return '';
       }
 
       // 8. Clean CID (remove ipfs:// prefix)
-      const cleanCid = cid.replace("ipfs://", "");
+      const cleanCid = cid.replace('ipfs://', '');
 
       this.logger?.info(`Successfully fetched CID: ${cleanCid} from ${endpoint}`);
       return cleanCid;
     } catch (error) {
       // Handle different types of errors
       if (error instanceof Error && error.message.includes('Security validation failed')) {
-        this.logger?.error(
-          `Security validation failed for ${endpoint}: ${error.message}`
-        );
+        this.logger?.error(`Security validation failed for ${endpoint}: ${error.message}`);
         throw error;
       }
 
       this.logger?.warn(`Failed to fetch CID from ${endpoint}: ${error}`);
-      return "";
+      return '';
     }
   }
 
@@ -378,28 +369,28 @@ export class GraphQLService {
    */
   private validateEndpointSecurity(endpoint: string): void {
     // 1. Basic format check
-    if (!endpoint || typeof endpoint !== "string") {
-      throw new Error("Invalid endpoint format");
+    if (!endpoint || typeof endpoint !== 'string') {
+      throw new Error('Invalid endpoint format');
     }
 
     endpoint = endpoint.trim();
 
     // 2. Length limit
     if (endpoint.length > 2048) {
-      throw new Error("Endpoint URL too long");
+      throw new Error('Endpoint URL too long');
     }
 
     // 3. Parse URL
     let parsedUrl: URL;
     try {
       parsedUrl = new URL(endpoint);
-    } catch (error) {
-      throw new Error("Invalid endpoint URL");
+    } catch {
+      throw new Error('Invalid endpoint URL');
     }
 
     // 4. Protocol check - only allow HTTP/HTTPS
-    if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-      throw new Error("Only HTTP/HTTPS protocols are allowed");
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      throw new Error('Only HTTP/HTTPS protocols are allowed');
     }
 
     // 5. Hostname check - prevent SSRF
@@ -407,16 +398,16 @@ export class GraphQLService {
 
     // Blocked hostnames
     const blockedHosts = [
-      "localhost",
-      "127.0.0.1",
-      "0.0.0.0",
-      "::1",
-      "169.254.169.254", // AWS metadata service
-      "metadata.google.internal", // GCP metadata service
+      'localhost',
+      '127.0.0.1',
+      '0.0.0.0',
+      '::1',
+      '169.254.169.254', // AWS metadata service
+      'metadata.google.internal', // GCP metadata service
     ];
 
     if (!this.allowLocalhost && blockedHosts.includes(hostname)) {
-      throw new Error("Access to local/internal hosts is forbidden");
+      throw new Error('Access to local/internal hosts is forbidden');
     }
 
     // 6. IP address check - prevent private network access
@@ -436,7 +427,7 @@ export class GraphQLService {
     if (!this.allowLocalhost) {
       for (const pattern of privateIpPatterns) {
         if (pattern.test(hostname)) {
-          throw new Error("Access to private IP ranges is forbidden");
+          throw new Error('Access to private IP ranges is forbidden');
         }
       }
     }
@@ -448,13 +439,13 @@ export class GraphQLService {
       // Block system ports (< 1024) unless explicitly allowed
       const allowedPorts = [80, 443, 8080, 8443];
       if (!allowedPorts.includes(portNum) && portNum < 1024) {
-        throw new Error("Port not allowed");
+        throw new Error('Port not allowed');
       }
     }
 
     // 8. URL should not contain credentials
     if (parsedUrl.username || parsedUrl.password) {
-      throw new Error("URL should not contain credentials");
+      throw new Error('URL should not contain credentials');
     }
   }
 
@@ -463,13 +454,13 @@ export class GraphQLService {
    */
   private createSecureRequestHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      "User-Agent": "SubQuery-MCP-Service/1.0",
+      'Content-Type': 'application/json',
+      'User-Agent': 'SubQuery-MCP-Service/1.0',
     };
 
     // Add token (if provided)
     if (this.config.authorization) {
-      headers["Authorization"] = this.config.authorization;
+      headers.Authorization = this.config.authorization;
     }
 
     return headers;

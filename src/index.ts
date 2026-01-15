@@ -1,50 +1,51 @@
-import type { Logger } from 'pino';
-import { createReactAgent } from "@langchain/langgraph/prebuilt";
-import {
-  type GraphQLAgent, type GraphQLAgentConfig,
-  type GraphQLProjectConfig,
-  type PersistentService
-} from "./types.js";
-import { GraphQLService } from "./graphql.service.js";
-import { ProjectManager } from "./project-manager.js";
-import { createGraphQLTools } from "./tools/index.js";
-import { BaseMessage, HumanMessage, isAIMessage, SystemMessage } from "@langchain/core/messages";
-import { buildSystemPrompt } from "./prompts.js";
-import { ChatOpenAI } from "@langchain/openai";
+// Copyright 2020-2025 SubQuery Pte Ltd authors & contributors
+// SPDX-License-Identifier: GPL-3.0
 
-export async function createGraphQLAgent(
+import {BaseMessage, HumanMessage, isAIMessage, SystemMessage} from '@langchain/core/messages';
+import {createReactAgent} from '@langchain/langgraph/prebuilt';
+import {ChatOpenAI} from '@langchain/openai';
+import type {Logger} from 'pino';
+import {GraphQLService} from './graphql.service.js';
+import {ProjectManager} from './project-manager.js';
+import {buildSystemPrompt} from './prompts.js';
+import {createGraphQLTools} from './tools/index.js';
+import {
+  type GraphQLAgent,
+  type GraphQLAgentConfig,
+  type GraphQLProjectConfig,
+  type PersistentService,
+} from './types.js';
+
+export function createGraphQLAgent(
   project: GraphQLProjectConfig,
   agentConfig: GraphQLAgentConfig,
   logger?: Logger
-): Promise<GraphQLAgent> {
+): GraphQLAgent {
   const llm = new ChatOpenAI({
     model: agentConfig.llm.model,
     temperature: agentConfig.llm.temperature ?? 0,
     apiKey: agentConfig.llm.apiKey ?? '',
     configuration: {
       baseURL: agentConfig.llm.baseUrl,
-    }
+    },
   });
-  const service = new GraphQLService(project, true,logger);
+  const service = new GraphQLService(project, true, logger);
   const tools = createGraphQLTools(service, project, logger);
-  const agent = createReactAgent({ llm, tools }).withConfig({
+  const agent = createReactAgent({llm, tools}).withConfig({
     recursionLimit: 10,
   });
 
   return {
     async invoke(question: string): Promise<string> {
       const systemPrompt = buildSystemPrompt(project, agentConfig.verbose);
-      const messages = [
-        new SystemMessage(systemPrompt),
-        new HumanMessage(question),
-      ];
+      const messages = [new SystemMessage(systemPrompt), new HumanMessage(question)];
 
-      const result = await agent.invoke({ messages });
+      const result = await agent.invoke({messages});
       const text = extractText(result);
 
-      return text || "Agent completed without producing a final response.";
-    }
-  }
+      return text || 'Agent completed without producing a final response.';
+    },
+  };
 }
 
 export async function initializeProjectConfig(
@@ -54,7 +55,7 @@ export async function initializeProjectConfig(
   customHeaders?: Record<string, string>,
   logger?: Logger
 ): Promise<GraphQLProjectConfig> {
-  const authorization = customHeaders?.['Authorization'];
+  const authorization = customHeaders?.Authorization;
   const graphqlService = new GraphQLService({endpoint, authorization} as GraphQLProjectConfig);
   const cid = await graphqlService.fetchCidFromEndpoint(endpoint);
 
@@ -70,17 +71,22 @@ export async function initializeProjectConfig(
 
   const pm = new ProjectManager(graphqlService, llmConfig, logger);
 
-  const enriched = await pm.enrichGraphQLConfig(
-    config,
-    false,
-    logger,
-  );
+  const enriched = await pm.enrichGraphQLConfig(config, false, logger);
   await persistentService.save(endpoint, enriched);
   return enriched;
-
 }
 
-function extractText(result: any): string | null {
+type AgentResult = {
+  messages?: BaseMessage[];
+  output?: string;
+};
+
+type ContentEntry = {
+  text?: string;
+  [key: string]: unknown;
+};
+
+function extractText(result: AgentResult): string | null {
   if (!result) {
     return null;
   }
@@ -90,27 +96,20 @@ function extractText(result: any): string | null {
 
     if (aiMessages.length > 0) {
       const last = aiMessages[aiMessages.length - 1];
-      if (typeof last?.content === "string") {
+      if (typeof last?.content === 'string') {
         return last.content;
       }
       if (Array.isArray(last?.content)) {
         return last.content
-          .map((entry: any) =>
-            entry && typeof entry.text === "string" ? entry.text : ""
-          )
-          .join("\n");
+          .map((entry: ContentEntry) => (entry && typeof entry.text === 'string' ? entry.text : ''))
+          .join('\n');
       }
     }
   }
 
-  if (typeof result.output === "string") {
+  if (typeof result.output === 'string') {
     return result.output;
   }
 
   return null;
 }
-
-
-
-
-

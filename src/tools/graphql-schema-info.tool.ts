@@ -1,12 +1,12 @@
-import {DynamicStructuredTool} from '@langchain/core/tools';
-import {z} from 'zod';
-import { type GraphQLProjectConfig, GraphqlProvider } from '../types.js';
-import type { Logger } from "pino";
+// Copyright 2020-2025 SubQuery Pte Ltd authors & contributors
+// SPDX-License-Identifier: GPL-3.0
 
-export function createGraphQLSchemaInfoTool(
-  config: GraphQLProjectConfig,
-  logger?: Logger,
-) {
+import {DynamicStructuredTool} from '@langchain/core/tools';
+import type {Logger} from 'pino';
+import {z} from 'zod';
+import {type GraphQLProjectConfig, GraphqlProvider} from '../types.js';
+
+export function createGraphQLSchemaInfoTool(config: GraphQLProjectConfig, logger?: Logger): DynamicStructuredTool {
   return new DynamicStructuredTool({
     name: 'graphql_schema_info',
     description: `Get the raw GraphQL entity schema with automatic node type detection and appropriate query patterns.
@@ -18,35 +18,39 @@ export function createGraphQLSchemaInfoTool(
 
     DO NOT call this tool multiple times. The raw schema contains everything needed.`,
     schema: z.object({}),
+    // eslint-disable-next-line @typescript-eslint/require-await
     func: async () => {
       try {
-        logger?.info({
-          domainName: config.domainName,
-          nodeType: config.nodeType,
-          schemaLength: config.schemaContent.length
-        }, `Executing for config`);
+        logger?.info(
+          {
+            domainName: config.domainName,
+            nodeType: config.nodeType,
+            schemaLength: config.schemaContent.length,
+          },
+          `Executing for config`
+        );
 
         const schemaContent = config.schemaContent;
 
         if (config.nodeType === GraphqlProvider.THE_GRAPH) {
           logger?.debug(`Using The Graph protocol schema generation`);
           const result = generateTheGraphSchemaInfo(schemaContent);
-          logger?.info({ resultLength: result.length }, `Successfully generated The Graph schema info`);
+          logger?.info({resultLength: result.length}, `Successfully generated The Graph schema info`);
           return result;
         } else if (config.nodeType === GraphqlProvider.SUBQL) {
           logger?.debug(`Using SubQL (PostGraphile) schema generation`);
           const result = generateSubQLSchemaInfo(schemaContent);
-          logger?.info({ resultLength: result.length }, `Successfully generated SubQL schema info`);
+          logger?.info({resultLength: result.length}, `Successfully generated SubQL schema info`);
           return result;
         } else {
-          logger?.warn({ nodeType: config.nodeType }, `Unknown node type`);
+          logger?.warn({nodeType: config.nodeType}, `Unknown node type`);
           return `Error: Unknown node type ${config.nodeType}`;
         }
       } catch (error) {
         logger?.error(error, `Error executing schema info tool`);
-        return `Error reading schema info: ${(error as any).message}`;
+        return `Error reading schema info: ${error instanceof Error ? error.message : String(error)}`;
       }
-    }
+    },
   });
 }
 

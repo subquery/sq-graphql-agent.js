@@ -1,20 +1,20 @@
-const IPFS_GATEWAY_POOL: Array<{ url: string; method: string }> = [
+// Copyright 2020-2025 SubQuery Pte Ltd authors & contributors
+// SPDX-License-Identifier: GPL-3.0
+
+const IPFS_GATEWAY_POOL: Array<{url: string; method: string}> = [
   {
-    url: "https://unauthipfs.subquery.network/ipfs/api/v0/cat?arg=",
-    method: "POST",
+    url: 'https://unauthipfs.subquery.network/ipfs/api/v0/cat?arg=',
+    method: 'POST',
   },
-  {url: "https://ipfs.thegraph.com/ipfs/", method: "GET"},
+  {url: 'https://ipfs.thegraph.com/ipfs/', method: 'GET'},
 ];
 
 const FETCH_TIMEOUT_MS = 30000;
-async function fetchWithTimeout(
-  url: string,
-  init: RequestInit
-): Promise<Response> {
+async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    return await fetch(url, {...init, signal: controller.signal});
   } finally {
     clearTimeout(timer);
   }
@@ -22,27 +22,21 @@ async function fetchWithTimeout(
 
 export async function fetchFromIPFS(rawPath: string): Promise<string> {
   const normalizedPath = rawPath
-    .replace(/^ipfs:\/\//, "")
-    .replace(/^\/?ipfs\//, "")
-    .replace(/^\/+/, "");
+    .replace(/^ipfs:\/\//, '')
+    .replace(/^\/?ipfs\//, '')
+    .replace(/^\/+/, '');
 
   // Get gateway pool from environment or use default
   let gatewayPool = IPFS_GATEWAY_POOL;
   if (process.env.IPFS_CONFIG) {
     try {
       gatewayPool = JSON.parse(process.env.IPFS_CONFIG);
-    } catch (error) {
-      // logger.warn(
-      //   {
-      //     error: error instanceof Error ? error.message : String(error),
-      //     errorType: "ipfs_config_parse_failed",
-      //   },
-      //   "Failed to parse IPFS_CONFIG, using default gateway pool"
-      // );
+    } catch {
+      // Failed to parse IPFS_CONFIG, using default gateway pool
     }
   }
 
-  const errors: Array<{ url: string; error: string }> = [];
+  const errors: Array<{url: string; error: string}> = [];
 
   // Create a promise for each gateway
   const fetchPromises = gatewayPool.map(async (gateway) => {
@@ -88,7 +82,7 @@ export async function fetchFromIPFS(rawPath: string): Promise<string> {
     await Promise.allSettled(fetchPromises);
 
     // All gateways failed
-    const errorSummary = errors.map((e) => `${e.url}: ${e.error}`).join("; ");
+    const errorSummary = errors.map((e) => `${e.url}: ${e.error}`).join('; ');
     throw new Error(
       `Failed to fetch ${normalizedPath} from all IPFS gateways (${errors.length} tried): ${errorSummary}`
     );

@@ -1,16 +1,17 @@
+// Copyright 2020-2025 SubQuery Pte Ltd authors & contributors
+// SPDX-License-Identifier: GPL-3.0
+
 import type {IntrospectionQuery} from 'graphql';
-import type { Logger } from 'pino';
+import type {Logger} from 'pino';
 
 export type GraphQLAgent = {
-  invoke: (
-    question: string,
-  ) => Promise<string>
-}
+  invoke: (question: string) => Promise<string>;
+};
 
 export enum GraphqlProvider {
   SUBQL = 'subql',
   THE_GRAPH = 'thegraph',
-  UNKNOWN = 'unknown'
+  UNKNOWN = 'unknown',
 }
 
 export interface ProjectManifest {
@@ -24,9 +25,11 @@ export interface ProjectManifest {
     kind?: string;
     [key: string]: unknown;
   }>;
-  schema?: string | {
-    file?: string | { '/': string };
-  };
+  schema?:
+    | string
+    | {
+        file?: string | {'/': string};
+      };
   runner?: Record<string, unknown>;
   [key: string]: unknown;
 }
@@ -40,11 +43,11 @@ export interface GraphQLAnalysisResult {
 
 export interface GraphQLProjectConfigInput {
   endpoint: string;
-  authorization?: string|undefined;
+  authorization?: string | undefined;
   cid?: string;
 }
 
-export interface GraphQLProjectConfig extends GraphQLProjectConfigInput{
+export interface GraphQLProjectConfig extends GraphQLProjectConfigInput {
   cid: string;
   schemaContent: string;
   nodeType: GraphqlProvider;
@@ -59,21 +62,17 @@ export interface GraphQLProjectConfig extends GraphQLProjectConfigInput{
 }
 
 export type PersistentService = {
-  save(endpoint: string, config: GraphQLProjectConfig, namespace?: string,): Promise<void>;
-  load(
-    endpoint: string,
-    cid?: string,
-    namespace?: string,
-  ): Promise<GraphQLProjectConfig | undefined>;
-}
+  save(endpoint: string, config: GraphQLProjectConfig, namespace?: string): Promise<void>;
+  load(endpoint: string, cid?: string, namespace?: string): Promise<GraphQLProjectConfig | undefined>;
+};
 
 export type GraphQLAgentConfig = {
   llm: {
-    model: string,
-    baseUrl?: string, // must put into env variable OPENAI_API_BASE
-    apiKey?: string,
-    temperature?: number,
-  },
+    model: string;
+    baseUrl?: string; // must put into env variable OPENAI_API_BASE
+    apiKey?: string;
+    temperature?: number;
+  };
   verbose: number; // 0 = compact, 1 = with reason, 2 = debug
-  logger?: Logger,
-}
+  logger?: Logger;
+};

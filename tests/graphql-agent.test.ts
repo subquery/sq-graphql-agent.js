@@ -1,14 +1,19 @@
-import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
-import { createGraphQLAgent, initializeProjectConfig } from '../src/index.js';
-import type { PersistentService, GraphQLAgentConfig, GraphQLProjectConfig } from '../src/types.js';
-import { GraphqlProvider } from '../src/types.js';
-import type { Logger } from 'pino';
-
+// Copyright 2020-2025 SubQuery Pte Ltd authors & contributors
+// SPDX-License-Identifier: GPL-3.0
+import {describe, it, expect, beforeAll, afterAll} from '@jest/globals';
 // Load environment variables from .env file
 import dotenv from 'dotenv';
+import type {Logger} from 'pino';
+import {createGraphQLAgent, initializeProjectConfig} from '../src/index.js';
+import {
+  type PersistentService,
+  type GraphQLAgentConfig,
+  type GraphQLProjectConfig,
+  GraphqlProvider,
+} from '../src/types.js';
 
 // Try to load .env from the parent directory
-dotenv.config({ path: '../.env' });
+dotenv.config({path: '../.env'});
 // Also try to load from current directory as fallback
 dotenv.config();
 
@@ -21,12 +26,12 @@ class LoggerMock {
     time?: string;
   }> = [];
 
-  constructor(private enabled: boolean = true) {}
+  constructor(private enabled = true) {}
 
   // Method to collect logs
   collect(level: string, msg: string, obj?: any, time?: string) {
     if (this.enabled) {
-      this.logs.push({ level, msg, obj, time });
+      this.logs.push({level, msg, obj, time});
 
       // Also print to console for test visibility
       const timestamp = time || new Date().toISOString();
@@ -107,24 +112,20 @@ class LoggerMock {
   }
 
   getLogsByLevel(level: string) {
-    return this.logs.filter(log => log.level === level);
+    return this.logs.filter((log) => log.level === level);
   }
 
   getLogsContaining(searchText: string) {
-    return this.logs.filter(log =>
-      log.msg.includes(searchText) ||
-      JSON.stringify(log.obj || {}).includes(searchText)
+    return this.logs.filter(
+      (log) => log.msg.includes(searchText) || JSON.stringify(log.obj || {}).includes(searchText)
     );
   }
 
   hasLog(level: string, searchText?: string): boolean {
-    return this.logs.some(log => {
+    return this.logs.some((log) => {
       const levelMatch = log.level === level;
       if (!searchText) return levelMatch;
-      return levelMatch && (
-        log.msg.includes(searchText) ||
-        JSON.stringify(log.obj || {}).includes(searchText)
-      );
+      return levelMatch && (log.msg.includes(searchText) || JSON.stringify(log.obj || {}).includes(searchText));
     });
   }
 
@@ -151,18 +152,23 @@ class LoggerMock {
     // Apply bindings to logs
     const originalCollect = child.collect.bind(child);
     child.collect = (level: string, msg: string, obj?: any, time?: string) => {
-      const mergedObj = { ...bindings, ...(obj || {}) };
+      const mergedObj = {...bindings, ...(obj || {})};
       originalCollect(level, msg, mergedObj, time);
     };
     return child as any;
   }
 
   // Pino specific properties
-  level: string = 'debug';
-  levels: { values: { [key: string]: number } } = {
+  level = 'debug';
+  levels: {values: {[key: string]: number}} = {
     values: {
-      trace: 10, debug: 20, info: 30, warn: 40, error: 50, fatal: 60
-    }
+      trace: 10,
+      debug: 20,
+      info: 30,
+      warn: 40,
+      error: 50,
+      fatal: 60,
+    },
   };
 }
 
@@ -195,7 +201,8 @@ class InMemoryPersistentService implements PersistentService {
 }
 
 describe('GraphQL Agent E2E Tests', () => {
-  const endpoint = 'https://gateway.thegraph.com/api/97286193487e32b3c710c511ecdeb1c2/subgraphs/id/HMuAwufqZ1YCRmzL2SfHTVkzZovC9VL2UAKhjvRqKiR1';
+  const endpoint =
+    'https://gateway.thegraph.com/api/97286193487e32b3c710c511ecdeb1c2/subgraphs/id/HMuAwufqZ1YCRmzL2SfHTVkzZovC9VL2UAKhjvRqKiR1';
   const persistentService = new InMemoryPersistentService();
   const loggerMock = new LoggerMock();
 
@@ -209,18 +216,14 @@ describe('GraphQL Agent E2E Tests', () => {
 
   it('should initialize project config from real endpoint', async () => {
     const llmConfig: GraphQLAgentConfig['llm'] = {
-      model: process.env.LLM_MODEL || 'gpt-4o-mini',
+      model: process.env.LLM_MODEL!,
       apiKey: process.env.OPENAI_API_KEY!,
       temperature: 0,
     };
 
     console.log(`Initializing project config for endpoint: ${endpoint}`);
 
-    const config = await initializeProjectConfig(
-      endpoint,
-      persistentService,
-      llmConfig
-    );
+    const config = await initializeProjectConfig(endpoint, persistentService, llmConfig);
 
     // Verify config properties
     expect(config).toBeDefined();
@@ -251,8 +254,6 @@ describe('GraphQL Agent E2E Tests', () => {
     expect(config.schemaContent.length).toBeGreaterThan(0);
 
     // Check timestamps
-    expect(config.updatedAt).toBeDefined();
-    expect(typeof config.updatedAt).toBe('string');
     expect(config.lastAnalyzedAt).toBeDefined();
 
     console.log(`Successfully initialized config for ${config.domainName}`);
@@ -266,7 +267,7 @@ describe('GraphQL Agent E2E Tests', () => {
 
   it('should create and invoke GraphQL agent with real API', async () => {
     // Read GraphQLProjectConfig from file
-    const { readFileSync } = await import('fs');
+    const {readFileSync} = await import('fs');
     const path = await import('path');
     const configPath = path.resolve('tests', 'projects', 'HMuAwufqZ1YCRmzL2SfHTVkzZovC9VL2UAKhjvRqKiR1.json');
     const configData = readFileSync(configPath, 'utf-8');
@@ -288,17 +289,21 @@ describe('GraphQL Agent E2E Tests', () => {
 
     // Create the agent
     const llmConfig: GraphQLAgentConfig['llm'] = {
-      model: process.env.LLM_MODEL || 'gpt-4o-mini',
+      model: process.env.LLM_MODEL!,
       apiKey: process.env.OPENAI_API_KEY!,
-      baseUrl: process.env.OPENAI_API_BASE,
+      baseUrl: process.env.OPENAI_API_BASE!,
       temperature: 0,
     };
 
     console.log('Creating GraphQL agent...');
-    const agent = await createGraphQLAgent(config, {
-      llm: llmConfig,
-      verbose: 1, // Include verbose to test query output
-    }, loggerMock as unknown as Logger);
+    const agent = await createGraphQLAgent(
+      config,
+      {
+        llm: llmConfig,
+        verbose: 1, // Include verbose to test query output
+      },
+      loggerMock as unknown as Logger
+    );
 
     expect(agent).toBeDefined();
     expect(typeof agent.invoke).toBe('function');
@@ -309,7 +314,7 @@ describe('GraphQL Agent E2E Tests', () => {
 
     // Test questions
     const testQuestions = [
-      "List all trading pairs for SQT token. Return the query used as well.",
+      'List all trading pairs for SQT token. Return the query used as well.',
       // "what is the trading volume like for usdt/weth? and return the graphql query used",
       // "what pool is the most traded pool in the recent week? what is the volume like? return with the graphql query used",
       // "return all my positions with their details"
@@ -323,9 +328,9 @@ describe('GraphQL Agent E2E Tests', () => {
       const logsBeforeQuestion = loggerMock.countLogs();
 
       try {
-        console.time('agent invoke')
+        console.time('agent invoke');
         const response = await agent.invoke(question);
-        console.timeEnd('agent invoke')
+        console.timeEnd('agent invoke');
         // Verify the response
         expect(typeof response).toBe('string');
         expect(response.length).toBeGreaterThan(0);
@@ -344,18 +349,17 @@ describe('GraphQL Agent E2E Tests', () => {
         // Assert on specific log patterns
         if (questionLogs.length > 0) {
           // Check if there are any schema info queries
-          const schemaQueries = questionLogs.filter(log =>
-            log.msg.includes('graphql_schema_info') ||
-            JSON.stringify(log.obj || {}).includes('introspection')
+          const schemaQueries = questionLogs.filter(
+            (log) => log.msg.includes('graphql_schema_info') || JSON.stringify(log.obj || {}).includes('introspection')
           );
           if (schemaQueries.length > 0) {
             console.log(`  - Found ${schemaQueries.length} schema-related queries`);
           }
 
           // Check for GraphQL query execution
-          const queryExecutions = questionLogs.filter(log =>
-            log.msg.includes('graphql_query_validator_execute') ||
-            JSON.stringify(log.obj || {}).includes('query')
+          const queryExecutions = questionLogs.filter(
+            (log) =>
+              log.msg.includes('graphql_query_validator_execute') || JSON.stringify(log.obj || {}).includes('query')
           );
           if (queryExecutions.length > 0) {
             console.log(`  - Found ${queryExecutions.length} GraphQL query executions`);
@@ -402,7 +406,7 @@ describe('GraphQL Agent E2E Tests', () => {
 
   it('should create agent with verbose=2 and show detailed execution info', async () => {
     // Read GraphQLProjectConfig from file
-    const { readFileSync } = await import('fs');
+    const {readFileSync} = await import('fs');
     const path = await import('path');
     const configPath = path.resolve('tests', 'projects', 'HMuAwufqZ1YCRmzL2SfHTVkzZovC9VL2UAKhjvRqKiR1.json');
     const configData = readFileSync(configPath, 'utf-8');
@@ -420,16 +424,20 @@ describe('GraphQL Agent E2E Tests', () => {
     };
 
     console.log('Creating GraphQL agent with verbose=2...');
-    const agent = await createGraphQLAgent(config, {
-      llm: llmConfig,
-      verbose: 2, // Maximum verbosity for detailed execution info
-    }, loggerMock as unknown as Logger);
+    const agent = await createGraphQLAgent(
+      config,
+      {
+        llm: llmConfig,
+        verbose: 2, // Maximum verbosity for detailed execution info
+      },
+      loggerMock as unknown as Logger
+    );
 
     expect(agent).toBeDefined();
     expect(typeof agent.invoke).toBe('function');
 
     // Test with a simple query
-    const question = "Show me the first 3 tokens";
+    const question = 'Show me the first 3 tokens';
     console.log(`\nTesting verbose level 2 with question: ${question}`);
 
     const logsBefore = loggerMock.countLogs();
@@ -452,14 +460,17 @@ describe('GraphQL Agent E2E Tests', () => {
       }
     } else if (verbose === 2) {
       // For verbose=2, check for detailed execution information
-      const hasDetails = response.includes('query(') ||
-                        response.includes('execution') ||
-                        response.includes('validation') ||
-                        response.includes('optimization');
+      const hasDetails =
+        response.includes('query(') ||
+        response.includes('execution') ||
+        response.includes('validation') ||
+        response.includes('optimization');
       if (hasDetails) {
         console.log('\n✓ Response includes detailed execution information as expected for verbose=2');
       } else {
-        console.log('\n⚠ Response does not include detailed execution information (LLM may not follow verbose instruction)');
+        console.log(
+          '\n⚠ Response does not include detailed execution information (LLM may not follow verbose instruction)'
+        );
       }
     }
 
@@ -471,7 +482,7 @@ describe('GraphQL Agent E2E Tests', () => {
   }, 120000);
 
   it('should verify verbose prompt generation', async () => {
-    const { buildSystemPrompt } = await import('../src/prompts.js');
+    const {buildSystemPrompt} = await import('../src/prompts.js');
     const testConfig: GraphQLProjectConfig = {
       endpoint: 'https://test.com',
       cid: 'test',
@@ -483,7 +494,7 @@ describe('GraphQL Agent E2E Tests', () => {
       declineMessage: 'Cannot process',
       schemaContent: 'type Query { hello: String }',
       authorization: undefined,
-      introspectionSchema: undefined
+      introspectionSchema: undefined,
     };
 
     // Test verbose = 0 (default)

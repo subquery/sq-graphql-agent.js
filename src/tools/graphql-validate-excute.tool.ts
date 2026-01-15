@@ -1,70 +1,82 @@
-import { DynamicStructuredTool } from '@langchain/core/tools';
-import { z } from 'zod';
-import type { GraphQLService } from '../graphql.service.js';
-import type { GraphQLProjectConfig } from '../types.js';
-import { parse } from "graphql";
-import type { Logger } from "pino";
+// Copyright 2020-2025 SubQuery Pte Ltd authors & contributors
+// SPDX-License-Identifier: GPL-3.0
+
+import {DynamicStructuredTool} from '@langchain/core/tools';
+import {parse} from 'graphql';
+import type {Logger} from 'pino';
+import {z} from 'zod';
+import type {GraphQLService} from '../graphql.service.js';
+import type {GraphQLProjectConfig} from '../types.js';
 
 export function createGraphQLValidatorAndExecuteTool(
-  config: GraphQLProjectConfig, 
+  config: GraphQLProjectConfig,
   graphQLService: GraphQLService,
-  logger?: Logger,
-  ) {
+  logger?: Logger
+) {
   const schema = z.object({
     query: z.string().describe('The GraphQL query to validate'),
-    variables: z.record(z.string(), z.any()).optional().describe('Variables for the GraphQL query')
+    variables: z.record(z.string(), z.any()).optional().describe('Variables for the GraphQL query'),
   });
 
   const _execute = async (query: string, variables?: Record<string, any>) => {
     const startTime = Date.now();
-    logger?.info({
-      domainName: config.domainName,
-      hasVariables: !!variables
-    }, 'Starting query execution');
-    logger?.debug({query}, "Executing query");
+    logger?.info(
+      {
+        domainName: config.domainName,
+        hasVariables: !!variables,
+      },
+      'Starting query execution'
+    );
+    logger?.debug({query}, 'Executing query');
 
     try {
       // Execute the query
-      const result = await graphQLService.execute(
-        query,
-        variables,
-      );
+      const result = await graphQLService.execute(query, variables);
 
       const executionTime = Date.now() - startTime;
-      logger?.info({
-        executionTime,
-        hasData: !!result.data,
-        hasErrors: !!(result.errors && result.errors.length > 0),
-        errorCount: result.errors?.length || 0
-      }, 'Query completed');
+      logger?.info(
+        {
+          executionTime,
+          hasData: !!result.data,
+          hasErrors: !!(result.errors && result.errors.length > 0),
+          errorCount: result.errors?.length || 0,
+        },
+        'Query completed'
+      );
 
       // Handle errors in the response
       if (result.errors && result.errors.length > 0) {
         const errorMessages = result.errors.map((error: any) => error.message || String(error));
-        logger?.error({ errors: errorMessages }, 'Query execution failed');
-        return `❌ Query execution failed:\n` + errorMessages.map((msg: string) => `- ${msg}`).join('\n');
+        logger?.error({errors: errorMessages}, 'Query execution failed');
+        return `❌ Query execution failed:\n${errorMessages.map((msg: string) => `- ${msg}`).join('\n')}`;
       }
 
       // Format the response
       if (result.data) {
         const formattedData = JSON.stringify(result.data, null, 2);
         const dataSize = new Blob([formattedData]).size;
-        logger?.info({
-          dataSizeKB: (dataSize / 1024).toFixed(2),
-          responseLength: formattedData.length,
-          executionTime
-        }, 'Query executed successfully');
+        logger?.info(
+          {
+            dataSizeKB: (dataSize / 1024).toFixed(2),
+            responseLength: formattedData.length,
+            executionTime,
+          },
+          'Query executed successfully'
+        );
         return `✅ Query executed successfully:\n\n${formattedData}`;
       }
 
-      logger?.warn({ result }, 'Unexpected response format');
+      logger?.warn({result}, 'Unexpected response format');
       return `⚠️ Unexpected response format:\n${JSON.stringify(result, null, 2)}`;
     } catch (error) {
       const executionTime = Date.now() - startTime;
-      logger?.error({
-        error: error instanceof Error ? error.message : String(error),
-        executionTime
-      }, 'Error executing query');
+      logger?.error(
+        {
+          error: error instanceof Error ? error.message : String(error),
+          executionTime,
+        },
+        'Error executing query'
+      );
       return `Error executing query: ${(error as any).message}`;
     }
   };
@@ -124,12 +136,15 @@ export function createGraphQLValidatorAndExecuteTool(
     The tool will automatically clean code blocks, backticks, and quotes.`,
     schema,
     func: async (input: z.infer<typeof schema>) => {
-      let { query, variables } = input;
+      let {query, variables} = input;
       const startTime = Date.now();
-      logger?.info({
-        originalQueryLength: query.length,
-        queryPreview: query.substring(0, 100) + (query.length > 100 ? '...' : '')
-      }, 'Starting query validation');
+      logger?.info(
+        {
+          originalQueryLength: query.length,
+          queryPreview: query.substring(0, 100) + (query.length > 100 ? '...' : ''),
+        },
+        'Starting query validation'
+      );
 
       try {
         // Clean up common formatting issues first
@@ -156,10 +171,13 @@ export function createGraphQLValidatorAndExecuteTool(
           query = query.slice(1, -1).trim();
         }
 
-        logger?.debug({
-          wasModified: originalQuery !== query,
-          cleanedQueryLength: query.length
-        }, 'Query cleaned');
+        logger?.debug(
+          {
+            wasModified: originalQuery !== query,
+            cleanedQueryLength: query.length,
+          },
+          'Query cleaned'
+        );
 
         // Basic syntax validation
         const validationErrors: string[] = [];
@@ -167,7 +185,7 @@ export function createGraphQLValidatorAndExecuteTool(
         // Check for basic GraphQL structure
         if (!query) {
           logger?.warn({}, 'Empty query provided');
-          return "❌ Validation failed: Empty query";
+          return '❌ Validation failed: Empty query';
         }
 
         // Check for balanced braces
@@ -184,18 +202,21 @@ export function createGraphQLValidatorAndExecuteTool(
           validationErrors.push(`Unbalanced parentheses: ${openParens} opening, ${closeParens} closing`);
         }
 
-        logger?.debug({
-          openBraces,
-          closeBraces,
-          openParens,
-          closeParens,
-          basicValidationErrors: validationErrors.length
-        }, 'Basic validation');
+        logger?.debug(
+          {
+            openBraces,
+            closeBraces,
+            openParens,
+            closeParens,
+            basicValidationErrors: validationErrors.length,
+          },
+          'Basic validation'
+        );
 
         // Early return if basic syntax errors found
         if (validationErrors.length > 0) {
-          logger?.error({ errors: validationErrors }, 'Basic syntax validation failed');
-          return `❌ Basic syntax validation failed:\n` + validationErrors.map((error: string) => `- ${error}`).join('\n');
+          logger?.error({errors: validationErrors}, 'Basic syntax validation failed');
+          return `❌ Basic syntax validation failed:\n${validationErrors.map((error: string) => `- ${error}`).join('\n')}`;
         }
 
         // Advanced validation with GraphQL parser
@@ -219,17 +240,20 @@ export function createGraphQLValidatorAndExecuteTool(
           }
 
           const validationTime = Date.now() - startTime;
-          logger?.info({
-            validationTime: `${validationTime}ms`,
-            hasDefinitions: !!(document && document.definitions),
-            definitionCount: document?.definitions?.length || 0,
-            schemaValidationErrors: schemaValidationErrors.length
-          }, `Query validation completed`);
+          logger?.info(
+            {
+              validationTime: `${validationTime}ms`,
+              hasDefinitions: !!(document && document.definitions),
+              definitionCount: document?.definitions?.length || 0,
+              schemaValidationErrors: schemaValidationErrors.length,
+            },
+            `Query validation completed`
+          );
 
           // If schema validation errors found, return them
           if (schemaValidationErrors.length > 0) {
-            logger?.error({ errors: schemaValidationErrors }, `Schema validation failed`);
-            return `❌ Schema validation failed:\n` + schemaValidationErrors.map((error: string) => `- ${error}`).join('\n');
+            logger?.error({errors: schemaValidationErrors}, `Schema validation failed`);
+            return `❌ Schema validation failed:\n${schemaValidationErrors.map((error: string) => `- ${error}`).join('\n')}`;
           }
 
           // If we have GraphQL service but no cached schema, try to fetch and cache it
@@ -237,26 +261,24 @@ export function createGraphQLValidatorAndExecuteTool(
             try {
               // Trigger schema fetch to populate cache for future validations
               graphQLService.fetchSchema().catch((error: any) => {
-                logger?.warn({ error: error.message }, `Failed to fetch schema for caching`);
+                logger?.warn({error: error.message}, `Failed to fetch schema for caching`);
               });
             } catch (fetchError: any) {
-              logger?.debug({ error: fetchError.message }, `Schema fetch attempt completed`);
+              logger?.debug({error: fetchError.message}, `Schema fetch attempt completed`);
             }
           }
 
           return await _execute(query, variables);
-
         } catch (parseError: any) {
           const validationTime = Date.now() - startTime;
           logger?.error(parseError, `Query parsing failed after ${validationTime}ms`);
           return `❌ Query parsing failed: ${parseError.message || String(parseError)}`;
         }
-
       } catch (error: any) {
         const validationTime = Date.now() - startTime;
         logger?.error(error, `Unexpected error after ${validationTime}ms`);
         return `Error validating query: ${error.message || String(error)}`;
       }
-    }
+    },
   });
 }

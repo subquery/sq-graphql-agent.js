@@ -1,19 +1,22 @@
-import type { GraphQLProjectConfig } from "./types.js";
+// Copyright 2020-2025 SubQuery Pte Ltd authors & contributors
+// SPDX-License-Identifier: GPL-3.0
+
+import type {GraphQLProjectConfig} from './types.js';
 
 export function buildSystemPrompt(config: GraphQLProjectConfig, verbose: number): string {
   const capabilities =
     config.domainCapabilities.length > 0
-      ? config.domainCapabilities.map((cap) => `• ${cap}`).join("\n")
-      : "• Explore indexed entities and summarize findings";
+      ? config.domainCapabilities.map((cap) => `• ${cap}`).join('\n')
+      : '• Explore indexed entities and summarize findings';
 
-  let verboseInstructions = "";
+  let verboseInstructions = '';
 
   if (verbose >= 1) {
     verboseInstructions = `
 VERBOSE OUTPUT (Level ${verbose}):
-${verbose >= 1 ? "- Always include the exact GraphQL query(s) used in your response" : ""}
-${verbose >= 2 ? "- After each query execution, report the tool call details including: number of queries composed, any validation failures, execution times, and data sizes returned" : ""}
-${verbose >= 2 ? "- Explain your query construction strategy and any optimizations made" : ""}`;
+${verbose >= 1 ? '- Always include the exact GraphQL query(s) used in your response' : ''}
+${verbose >= 2 ? '- After each query execution, report the tool call details including: number of queries composed, any validation failures, execution times, and data sizes returned' : ''}
+${verbose >= 2 ? '- Explain your query construction strategy and any optimizations made' : ''}`;
   }
 
   return `You are a GraphQL assistant for ${config.domainName}.
