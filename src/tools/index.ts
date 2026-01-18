@@ -11,11 +11,12 @@ import {createGraphQLValidatorAndExecuteTool} from './graphql-validate-excute.to
 export function createGraphQLTools(
   service: GraphQLService,
   config: GraphQLProjectConfig,
-  logger?: Logger
+  logger?: Logger,
+  verbose?: string
 ): DynamicStructuredTool[] {
   return [
-    createGraphQLSchemaInfoTool(config, logger),
-    createGraphQLValidatorAndExecuteTool(config, service, logger),
+    createGraphQLSchemaInfoTool(config, logger, verbose),
+    createGraphQLValidatorAndExecuteTool(config, service, logger, verbose),
     // createGraphQLValidatorTool(config, service),
     // createGraphQLExecuteTool(config, service)
   ];

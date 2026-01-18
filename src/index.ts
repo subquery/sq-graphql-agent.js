@@ -30,7 +30,8 @@ export function createGraphQLAgent(
     },
   });
   const service = new GraphQLService(project, true, logger);
-  const tools = createGraphQLTools(service, project, logger);
+  const verbose = agentConfig.verbose > 0 ? String(agentConfig.verbose) : undefined;
+  const tools = createGraphQLTools(service, project, logger, verbose);
   const agent = createReactAgent({llm, tools}).withConfig({
     recursionLimit: 10,
   });
