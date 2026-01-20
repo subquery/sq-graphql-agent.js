@@ -6,7 +6,7 @@ import type {Logger} from 'pino';
 import {z} from 'zod';
 import {type GraphQLProjectConfig, GraphqlProvider} from '../types.js';
 
-export function createGraphQLSchemaInfoTool(config: GraphQLProjectConfig, logger?: Logger): DynamicStructuredTool {
+export function createGraphQLSchemaInfoTool(config: GraphQLProjectConfig, logger?: Logger, verbose?: string): DynamicStructuredTool {
   return new DynamicStructuredTool({
     name: 'graphql_schema_info',
     description: `Get the raw GraphQL entity schema with automatic node type detection and appropriate query patterns.
