@@ -3,6 +3,7 @@
 
 import {type Logger} from 'pino';
 import yaml from 'yaml';
+import {getCodexQuerySchema} from './codex/schema.js';
 import type {GraphQLService} from './graphql.service.js';
 import {analyzeProjectWithLLM} from './llm.js';
 import {
@@ -29,6 +30,11 @@ export class ProjectManager {
   ): Promise<GraphQLProjectConfig> {
     if (!this.shouldAttemptAnalysis(config, force)) {
       return config;
+    }
+
+    // Check for Codex FIRST - skip IPFS logic
+    if (this.isCodexEndpoint(config.endpoint)) {
+      return this.enrichCodexConfig(config, logger);
     }
 
     try {
@@ -87,6 +93,38 @@ export class ProjectManager {
         lastAnalysisError: message,
       };
     }
+  }
+
+  private isCodexEndpoint(endpoint: string): boolean {
+    try {
+      const hostname = new URL(endpoint).hostname.toLowerCase();
+      return hostname.includes('codex.io') || hostname.includes('codex');
+    } catch {
+      return false;
+    }
+  }
+
+  private enrichCodexConfig(config: GraphQLProjectConfig, logger?: Logger): GraphQLProjectConfig {
+    logger?.info({endpoint: config.endpoint}, 'Detected Codex endpoint, using embedded schema');
+
+    return {
+      ...config,
+      schemaContent: getCodexQuerySchema(),
+      nodeType: GraphqlProvider.CODEX,
+      domainName: 'Codex GraphQL API',
+      domainCapabilities: [
+        'NFT pool queries and analytics',
+        'NFT collection metadata and stats',
+        'Token prices and market data',
+        'Wallet tracking and balances',
+        'DEX pair and exchange data',
+        'Webhook management',
+        'Network status information',
+        'Real-time subscriptions',
+      ],
+      declineMessage: 'This query is outside the scope of Codex API capabilities.',
+      lastAnalyzedAt: new Date().toISOString(),
+    };
   }
 
   private detectProvider(manifest: ProjectManifest): GraphqlProvider {

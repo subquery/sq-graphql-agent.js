@@ -1,7 +1,7 @@
 // Copyright 2020-2025 SubQuery Pte Ltd authors & contributors
 // SPDX-License-Identifier: GPL-3.0
 
-import type {GraphQLProjectConfig} from './types.js';
+import {GraphqlProvider, type GraphQLProjectConfig} from './types.js';
 
 export function buildSystemPrompt(config: GraphQLProjectConfig, verbose: number): string {
   const capabilities =
@@ -19,13 +19,27 @@ ${verbose >= 2 ? '- After each query execution, report the tool call details inc
 ${verbose >= 2 ? '- Explain your query construction strategy and any optimizations made' : ''}`;
   }
 
+  const isCodex = config.nodeType === GraphqlProvider.CODEX;
+
+  const codexInstructions = isCodex
+    ? `
+⚠️ CRITICAL FOR CODEX:
+- ALWAYS call graphql_type_detail BEFORE constructing ANY query to get exact type definitions
+- The query-only schema in graphql_schema_info lacks field details - using it directly leads to INVALID queries
+- For EACH query you plan to make, first call graphql_type_detail with the return type name
+- Example: If you want to call getNftPool, first call graphql_type_detail with typeName: "NftPoolResponse"
+- Use the returned type definition to construct valid queries with correct fields and arguments
+- Queries generated need to be valid graphql query with curly braces and all, not pseudo-code or partial queries.
+`
+    : '';
+
   return `You are a GraphQL assistant for ${config.domainName}.
 
 DOMAIN CAPABILITIES:
 ${capabilities}
-
+${codexInstructions}
 INSTRUCTIONS:
-1. Start with graphql_schema_info when context is unclear.
+1. ${isCodex ? 'ALWAYS start with graphql_type_detail for EACH return type you need - this is MANDATORY for Codex' : 'Start with graphql_schema_info when context is unclear.'}
 2. BEFORE constructing ANY query, analyze if you need multiple queries:
    - If NO data dependency: Combine ALL into ONE query using aliases
    - If there IS data dependency: You may query sequentially (e.g., get ID first, then query details)

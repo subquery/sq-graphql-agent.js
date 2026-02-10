@@ -11,6 +11,7 @@ export type GraphQLAgent = {
 export enum GraphqlProvider {
   SUBQL = 'subql',
   THE_GRAPH = 'thegraph',
+  CODEX = 'codex',
   UNKNOWN = 'unknown',
 }
 
@@ -59,6 +60,7 @@ export interface GraphQLProjectConfig extends GraphQLProjectConfigInput {
   declineMessage: string;
   // Cached introspection schema from endpoint
   introspectionSchema?: IntrospectionQuery;
+  fullSchema?: string;
 }
 
 export type PersistentService = {

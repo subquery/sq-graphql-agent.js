@@ -5,6 +5,7 @@ import {BaseMessage, HumanMessage, isAIMessage, SystemMessage} from '@langchain/
 import {createReactAgent} from '@langchain/langgraph/prebuilt';
 import {ChatOpenAI} from '@langchain/openai';
 import type {Logger} from 'pino';
+import {getCodexConfig} from './codex/config.js';
 import {GraphQLService} from './graphql.service.js';
 import {ProjectManager} from './project-manager.js';
 import {buildSystemPrompt} from './prompts.js';
@@ -56,6 +57,21 @@ export async function initializeProjectConfig(
   logger?: Logger
 ): Promise<GraphQLProjectConfig> {
   const authorization = customHeaders?.Authorization;
+
+  // Check if this is Codex
+  const isCodex = endpoint.includes('codex.io') || endpoint.includes('codex');
+
+  if (isCodex) {
+    // For Codex, use the bundled config directly (skip LLM analysis)
+    logger?.info({endpoint}, 'Detected Codex endpoint, using bundled config');
+    const config = getCodexConfig(endpoint, authorization);
+
+    // Save to persistent service for caching
+    await persistentService.save(endpoint, config);
+    return config;
+  }
+
+  // For non-Codex endpoints, use the existing flow
   const graphqlService = new GraphQLService({endpoint, authorization} as GraphQLProjectConfig);
   const cid = await graphqlService.fetchCidFromEndpoint(endpoint);
 

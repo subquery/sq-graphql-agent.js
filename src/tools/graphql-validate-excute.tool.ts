@@ -256,18 +256,6 @@ export function createGraphQLValidatorAndExecuteTool(
             return `❌ Schema validation failed:\n${schemaValidationErrors.map((error: string) => `- ${error}`).join('\n')}`;
           }
 
-          // If we have GraphQL service but no cached schema, try to fetch and cache it
-          if (graphQLService) {
-            try {
-              // Trigger schema fetch to populate cache for future validations
-              graphQLService.fetchSchema().catch((error: any) => {
-                logger?.warn({error: error.message}, `Failed to fetch schema for caching`);
-              });
-            } catch (fetchError: any) {
-              logger?.debug({error: fetchError.message}, `Schema fetch attempt completed`);
-            }
-          }
-
           return await _execute(query, variables);
         } catch (parseError: any) {
           const validationTime = Date.now() - startTime;

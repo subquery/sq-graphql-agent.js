@@ -6,6 +6,7 @@ import type {Logger} from 'pino';
 import type {GraphQLService} from '../graphql.service.js';
 import type {GraphQLProjectConfig} from '../types.js';
 import {createGraphQLSchemaInfoTool} from './graphql-schema-info.tool.js';
+import {createGraphQLTypeDetailTool} from './graphql-type-detail.tool.js';
 import {createGraphQLValidatorAndExecuteTool} from './graphql-validate-excute.tool.js';
 
 export function createGraphQLTools(
@@ -13,10 +14,16 @@ export function createGraphQLTools(
   config: GraphQLProjectConfig,
   logger?: Logger
 ): DynamicStructuredTool[] {
-  return [
+  const tools: DynamicStructuredTool[] = [
     createGraphQLSchemaInfoTool(config, logger),
     createGraphQLValidatorAndExecuteTool(config, service, logger),
-    // createGraphQLValidatorTool(config, service),
-    // createGraphQLExecuteTool(config, service)
   ];
+
+  // Add type detail tool only for Codex
+  const typeDetailTool = createGraphQLTypeDetailTool(config, logger);
+  if (typeDetailTool) {
+    tools.push(typeDetailTool);
+  }
+
+  return tools;
 }

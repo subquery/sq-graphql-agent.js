@@ -42,6 +42,11 @@ export function createGraphQLSchemaInfoTool(config: GraphQLProjectConfig, logger
           const result = generateSubQLSchemaInfo(schemaContent);
           logger?.info({resultLength: result.length}, `Successfully generated SubQL schema info`);
           return result;
+        } else if (config.nodeType === GraphqlProvider.CODEX) {
+          logger?.debug(`Using Codex schema generation`);
+          const result = generateCodexSchemaInfo(schemaContent);
+          logger?.info({resultLength: result.length}, `Successfully generated Codex schema info`);
+          return result;
         } else {
           logger?.warn({nodeType: config.nodeType}, `Unknown node type`);
           return `Error: Unknown node type ${config.nodeType}`;
@@ -336,6 +341,30 @@ ${schemaContent}
 2. Infer queries: project(id), projects(filter/pagination)
 3. Identify field types to determine foreign key relationships
 4. Construct your GraphQL query using the patterns above
+5. Validate the query, then execute it
+
+DO NOT call graphql_schema_info again - everything needed is above.`;
+}
+
+function generateCodexSchemaInfo(_schemaContent: string): string {
+  return `📖 CODEX GRAPHQL API SCHEMA & RULES:
+
+🔍 CODEX SUPPORTED QUERIES:
+${_schemaContent}
+
+📋 CODEX API OVERVIEW:
+Codex is a unified GraphQL API for blockchain data, supporting:
+- NFT collections, pools, and marketplace data
+- Token prices, pairs, and DEX analytics
+- Wallet tracking and portfolio analytics
+- Real-time subscriptions for events
+- Webhook management for notifications
+
+💡 NOW USE THE QUERY PATTERNS ABOVE TO:
+1. Choose the appropriate query for your data needs
+2. Construct filters using the correct format (v1 or v2 based on query type)
+3. Apply appropriate network IDs for queries
+4. Use offset-based pagination for large result sets
 5. Validate the query, then execute it
 
 DO NOT call graphql_schema_info again - everything needed is above.`;

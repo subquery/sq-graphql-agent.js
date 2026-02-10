@@ -1,0 +1,766 @@
+type Query {
+    #
+    #NETWORK & BLOCK QUERIES
+    #────────────────────────
+
+    """Get block data (number, timestamp, hash) for specific blockNumbers or timestamps. Max 25 inputs per request. Returns array of Block objects with networkId, blockNumber, timestamp, and hash."""
+    blocks(
+        input: BlocksInput!
+    ): [Block!]!
+    """Get all supported networks with their IDs, names, chain IDs, and types. Useful for discovering available networks for other queries."""
+    getNetworks: [Network!]!
+    """Get status information for specific networks by their IDs. Returns metadata including whether the network is operational and indexed."""
+    getNetworkStatus(
+        """The list of network IDs."""
+        networkIds: [Int!]!
+    ): [MetadataResponse!]
+    """Get network configurations including base token info, explorer URLs, and supported features for specified networks."""
+    getNetworkConfigs(
+        networkIds: [Int!]
+    ): [NetworkConfig!]!
+
+    #NFT POOL QUERIES (AMM NFT Marketplaces like Sudoswap, Blur, etc.)
+    #──────────────────────────────────────────────────────────────────
+
+    """Get a single NFT pool by address and network. Returns pool details including current state, liquidity, and trading parameters."""
+    getNftPool(
+        """The contract address of the NFT pool."""
+        address: String!
+        """The network ID the NFT collection is deployed on."""
+        networkId: Int!
+    ): NftPoolResponse
+    """Get swap/mint/burn events for NFT pools with filtering by collection, pool, exchange, event type, and time range. Supports cursor-based pagination."""
+    getNftPoolEvents(
+        """The network ID the NFT collection is deployed on."""
+        networkId: Int!
+        """The contract address of the NFT collection."""
+        collectionAddress: String
+        """The NFT pool address to filter by."""
+        poolAddress: String
+        """The NFT AMM marketplace address to filter by."""
+        exchangeAddress: String
+        """The event types to filter by."""
+        eventTypes: [NftPoolEventType!]
+        """The time range to filter by."""
+        timestamp: EventQueryTimestampInput
+        """The cursor to use for pagination."""
+        cursor: String
+        """The maximum number of NFT pool events to return."""
+        limit: Int
+    ): NftPoolEventsResponse
+    """Get aggregated statistics for an NFT collection within a specific AMM marketplace. Includes volume, floor price, and pool metrics."""
+    getNftPoolCollection(
+        """The contract address of the NFT collection."""
+        collectionAddress: String!
+        """The NFT AMM marketplace address to filter by."""
+        exchangeAddress: String!
+        """The network ID the NFT collection is deployed on."""
+        networkId: Int!
+    ): NftPoolCollectionResponse
+    """Get all NFT collections that have active pools on a specific AMM marketplace. Returns paginated list with collection stats."""
+    getNftPoolCollectionsByExchange(
+        """The NFT AMM marketplace address to filter by."""
+        exchangeAddress: String!
+        """The network ID the NFT collection is deployed on."""
+        networkId: Int!
+        """The cursor to use for pagination."""
+        cursor: String
+        """The maximum number of NFT collections to return."""
+        limit: Int
+    ): GetNftPoolCollectionsResponse
+    """Get all NFT pools for a specific collection on a specific AMM marketplace. Useful for finding all liquidity sources for a collection."""
+    getNftPoolsByCollectionAndExchange(
+        """The contract address of the NFT collection."""
+        collectionAddress: String!
+        """The NFT AMM marketplace address to filter by."""
+        exchangeAddress: String!
+        """The network ID the NFT collection is deployed on."""
+        networkId: Int!
+        """The cursor to use for pagination."""
+        cursor: String
+        """The maximum number of NFT pools to return."""
+        limit: Int
+    ): GetNftPoolsResponse
+    """Get all NFT pools owned by a specific wallet address. Useful for viewing a user's NFT liquidity positions."""
+    getNftPoolsByOwner(
+        """The contract address of the pool owner."""
+        ownerAddress: String!
+        """The network ID the NFT collection is deployed on."""
+        networkId: Int!
+        """The NFT AMM marketplace address to filter by."""
+        exchangeAddress: String
+        """The cursor to use for pagination."""
+        cursor: String
+        """The maximum number of NFT pools to return."""
+        limit: Int
+    ): GetNftPoolsResponse
+    """Get time-series aggregated statistics for NFT pools/collections including volume, transactions, and unique traders over a specified time range."""
+    getNftPoolStats(
+        """The contract address of the NFT collection."""
+        collectionAddress: String!
+        """The NFT AMM marketplace address to filter by."""
+        exchangeAddress: String!
+        """The network ID the NFT collection is deployed on."""
+        networkId: Int!
+        """The unix timestamp for the start of the requested range."""
+        startTime: Int!
+        """The unix timestamp for the end of the requested range."""
+        endTime: Int!
+        """The NFT pool address to filter by."""
+        poolAddress: String
+    ): NftPoolStatsResponse
+    """Filter and search NFT collections with extensive filtering options including network, ERC type, supply, and time-windowed stats. Supports ranking, search phrases, and pagination."""
+    filterNftCollections(
+        """A set of filters to apply."""
+        filters: NftCollectionFilters
+        """A list of ranking attributes to apply."""
+        rankings: [NftCollectionRanking]
+        """A phrase to search for. Can match a collection contract address or ID (`address`:`networkId`)."""
+        phrase: String
+        """A list of collection contract addresses or IDs (`address`:`networkId`) to filter by."""
+        collections: [String]
+        """The maximum number of NFT collections to return."""
+        limit: Int
+        """Where in the list the server should start when returning items. Use `count`+`offset` from the previous query to request the next page of results."""
+        offset: Int
+    ): NftCollectionFilterConnection
+    """Filter NFT collections that have active AMM pools. Useful for discovering tradeable NFT collections with liquidity."""
+    filterNftPoolCollections(
+        """A set of filters to apply."""
+        filters: NftPoolCollectionFilters
+        """A phrase to search for. Can partially match an NFT collection name."""
+        phrase: String
+        """A list of ranking attributes to apply."""
+        rankings: [NftPoolCollectionRanking]
+        """The maximum number of NFT collections to return."""
+        limit: Int
+        """Where in the list the server should start when returning items. Use `count`+`page` from the previous query to request the next page of results."""
+        offset: Int
+    ): NftPoolCollectionFilterConnection
+    """Filter and search NFT pools with extensive filtering by network, exchange, collection, owner, and pool statistics (balances, volumes, lifetime stats). Supports ranking and pagination."""
+    filterNftPools(
+        """A set of filters to apply."""
+        filters: NftPoolFilters
+        """A list of ranking attributes to apply."""
+        rankings: [NftPoolRanking]
+        phrase: String
+        """The maximum number of NFT pools to return."""
+        limit: Int
+        """Where in the list the server should start when returning items. Use `count`+`page` from the previous query to request the next page of results."""
+        offset: Int
+    ): NftPoolFilterConnection
+
+    #NFT COLLECTION & ASSET QUERIES
+    #─────────────────────────────
+
+    """Search for NFT collections and assets across all marketplaces. Returns matching collections/assets with stats for the specified time window."""
+    searchNfts(
+        """The maximum number of NFTs to return."""
+        limit: Int
+        """The list of network IDs to filter by."""
+        networkFilter: [Int!]
+        """The time frame to use for calculating stats. Can be `1h`, `4h`, `12h`, or `1d` (default)."""
+        window: String
+        """The query string to search for. Can match an NFT collection contract address or partially match a collection's name or symbol."""
+        search: String
+        """The level of NFTs to include in the search. Can be `Asset` or `Collection`."""
+        include: [NftSearchable!]
+        """Whether to filter collections that could be linked to wash trading"""
+        filterWashTrading: Boolean
+    ): NftSearchResponse
+    """Get comprehensive metadata for an NFT collection including description, image links, contract type, and market statistics across different time windows."""
+    getNftCollectionMetadata(
+        """The ID of the NFT collection (`address`:`networkId`). For example, `0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d:1`."""
+        collectionId: String @deprecated(reason: "Use address & networkId instead.")
+        """The contract address of the NFT collection."""
+        address: String
+        """The network ID the NFT collection is deployed on."""
+        networkId: Int
+    ): NftCollectionMetadataResponse
+    """Get NFT assets (tokens) within a collection with optional filtering by token IDs. Supports pagination and optional on-chain metadata fetching."""
+    getNftAssets(
+        """The contract address of the NFT collection."""
+        address: String!
+        """The network ID the NFT collection is deployed on."""
+        networkId: Int!
+        """An optional list of token IDs to filter by."""
+        tokenIds: [String]
+        """Whether to trigger fetching onchain metadata for missing assets. Defaults to false. Fetch results are delayed and can be ingested realtime via onNftAssetsCreated subscription. Free tier API users are limited to 1 missing asset fetch per request, and may only retry fetching a missing asset once per week. To remove these limitations, please upgrade your API plan at https://www.dashboard.defined.fi/plan."""
+        fetchMissingAssets: Boolean
+        """The cursor to use for pagination."""
+        cursor: String
+        """The maximum number of NFT assets to return."""
+        limit: Int
+    ): NftAssetsConnection
+    """Get time-series bucketed statistics for an NFT collection (volume, floor price, sales count) with configurable durations and bucket counts. Useful for charting and analytics."""
+    getDetailedNftStats(
+        """The contract address of the NFT collection."""
+        collectionAddress: String!
+        """The network ID the NFT collection is deployed on."""
+        networkId: Int!
+        """The marketplace address to filter by. Can be used to get marketplace-specific metrics, otherwise uses all."""
+        grouping: String
+        """The unix timestamp for the stats. Defaults to current."""
+        timestamp: Int
+        """The list of durations to get detailed pair stats for."""
+        durations: [DetailedNftStatsDuration]
+        """The number of aggregated values to receive. Note: Each duration has predetermined bucket sizes. The first n-1 buckets are historical. The last bucket is a snapshot of current data. duration `day1`: 6 buckets (4 hours each) plus 1 partial bucket duration `hour12`: 12 buckets (1 hour each) plus 1 partial bucket duration `hour4`: 8 buckets (30 min each) plus 1 partial bucket duration `hour1`: 12 buckets (5 min each) plus 1 partial bucket duration `min5`: 5 buckets (1 min each) plus 1 partial bucket For example, requesting 11 buckets for a `min5` duration will return the last 10 minutes worth of data plus a snapshot for the current minute."""
+        bucketCount: Int
+    ): DetailedNftStats
+    """Get NFT transaction events (sales, transfers, listings) across any marketplace with filtering by collection, token, exchange, time range, and event type."""
+    getNftEvents(
+        """The contract address of the NFT collection."""
+        address: String
+        """The NFT marketplace address to filter by."""
+        exchangeAddress: String
+        """The NFT pool address to filter by."""
+        poolAddress: String
+        """The network ID the NFT collection is deployed on."""
+        networkId: Int!
+        """The token ID to filter by."""
+        tokenId: String
+        """The cursor to use for pagination."""
+        cursor: String
+        """The time range to filter by."""
+        timestamp: EventQueryTimestampInput
+        """The maximum number of NFT events to return."""
+        limit: Int
+        includeTransfers: Boolean
+    ): NftEventsConnection
+    """Get metadata for multiple NFT collections in a single request. Useful for batch collection lookups."""
+    getNftContracts(
+        """A list of NFT contract address and network IDs."""
+        contracts: [NftContractInput]
+    ): [EnhancedNftContract]
+
+    #PARALLEL NFT QUERIES (Parallel-specific NFT marketplace)
+    #─────────────────────────────────────────────────────
+
+    """Filter and search Parallel NFT assets with extensive filtering options. Parallel is a specialized NFT trading card game."""
+    filterNftParallelAssets(
+        """A set of filters to apply."""
+        filters: ParallelAssetFilters
+        """A phrase to search for. Can match a Parallel asset ID (`address`:`tokenId`) or partially match a name."""
+        phrase: String
+        """A set of parameters to match."""
+        match: ParallelAssetMatchers
+        """A list of ranking attributes to apply."""
+        rankings: [ParallelAssetRanking]
+        """The maximum number of Parallel assets to return."""
+        limit: Int
+        """Where in the list the server should start when returning items. Use `count`+`offset` from the previous query to request the next page of results."""
+        offset: Int
+    ): ParallelAssetFilterConnection
+    """Get historical changes to Parallel card metadata over time. Useful for tracking card attribute evolution."""
+    getParallelCardChanges(
+        """The token ID for a Parallel asset."""
+        tokenId: String
+        """The time frame to request card changes."""
+        timestamp: ParallelCardChangeQueryTimestampInput
+        """The cursor to use for pagination."""
+        cursor: String
+        """The maximum number of Parallel card changes to return."""
+        limit: Int
+    ): ParallelCardChangesConnection
+
+    #PRIME POOL QUERIES (Game-specific NFT staking pools)
+    #────────────────────────────────────────────────────
+
+    """Get cached assets in Prime pools (NFT staking for games). Filter by pool, wallet, or pool ID."""
+    getPrimePoolAssets(
+        """The network ID the Prime pool is deployed on."""
+        networkId: Int!
+        """The contract address of the Prime pool."""
+        poolContractAddress: String
+        """The pool ID for the Prime pool, within the contract."""
+        poolId: String
+        """The owner wallet address to filter assets by."""
+        walletAddress: String
+        """The maximum number of Prime Pool assets to return."""
+        limit: Int
+        """The cursor to use for pagination."""
+        cursor: String
+    ): PrimePoolAssetConnection
+    """Get events from Prime pools (deposits, withdrawals, rewards) with filtering by pool, wallet, and event type."""
+    getPrimePoolEvents(
+        """The network ID the Prime pool is deployed on."""
+        networkId: Int!
+        """The contract address of the Prime pool."""
+        poolContractAddress: String
+        """The pool ID for the Prime pool, within the contract."""
+        poolId: String
+        """The calling wallet address to filter events by."""
+        walletAddress: String
+        """The event types to query for."""
+        eventTypes: [PrimePoolEventType]
+        """The maximum number of Prime Pool events to return."""
+        limit: Int
+        """The cursor to use for pagination."""
+        cursor: String
+    ): PrimePoolEventConnection
+    """Get Prime pool contracts with their configurations and statistics."""
+    getPrimePools(
+        """The contract address for the prime pool."""
+        address: String!
+        """The network ID the prime pool is deployed on."""
+        networkId: Int!
+        """An optional list of pool IDs to filter by."""
+        poolIds: [String]
+        """The maximum number of Prime pools to return."""
+        limit: Int
+        """The cursor to use for pagination."""
+        cursor: String
+    ): PrimePoolConnection
+
+    #WALLET NFT QUERIES
+    #──────────────────
+
+    """Get wallets holding a specific NFT collection, ranked by holdings descending. Also returns total unique holder count."""
+    nftHolders(
+        input: NftHoldersInput!
+    ): NftHoldersResponse!
+    """Get all NFT collections held by a specific wallet with quantities and collection metadata."""
+    walletNftCollections(
+        input: WalletNftCollectionsInput!
+    ): WalletNftCollectionsResponse!
+    """Get NFT assets held by a specific wallet for a single collection. Useful for viewing wallet's NFTs in a collection."""
+    walletNftCollectionAssets(
+        input: WalletNftCollectionAssetsInput!
+    ): WalletNftCollectionAssetsResponse!
+
+    #TOKEN & PAIR QUERIES
+    #────────────────────
+
+    """Filter and search tokens with extensive filtering by network, exchange, price, volume, market cap, liquidity, and time-windowed stats. Supports ranking, search, and pagination."""
+    filterTokens(
+        """A set of filters to apply."""
+        filters: TokenFilters
+        """The type of statistics returned. Can be `FILTERED` or `UNFILTERED`. Default is `UNFILTERED`."""
+        statsType: TokenPairStatisticsType
+        """A phrase to search for. Can match a token or pair contract address or partially match a token's name or symbol."""
+        phrase: String
+        """A list of token IDs (`address:networkId`) or addresses. Can be left blank to discover new tokens."""
+        tokens: [String]
+        """A list of token IDs (`address:networkId`) to exclude from results"""
+        excludeTokens: [String]
+        """A list of ranking attributes to apply."""
+        rankings: [TokenRanking]
+        """The maximum number of tokens to return."""
+        limit: Int
+        """Where in the list the server should start when returning items. Use `count`+`page` from the previous query to request the next page of results."""
+        offset: Int
+    ): TokenFilterConnection
+    """Filter and search DEX trading pairs with extensive filtering by network, exchange, tokens, price, volume, and liquidity. Supports ranking, search, and pagination."""
+    filterPairs(
+        """A set of filters to apply."""
+        filters: PairFilters
+        """The type of statistics returned. Can be `FILTERED` or `UNFILTERED`. Default is `UNFILTERED`."""
+        statsType: TokenPairStatisticsType
+        """A phrase to search for. Can match a token or pair contract address or ID (`address:networkId`), or partially match a token name or symbol."""
+        phrase: String
+        """A list of pair or token contract addresses or IDs (`address:networkId`) to filter by."""
+        pairs: [String]
+        """A set of token contract addresses that make up a pair. Can be used in place of a pair contract address."""
+        matchTokens: PairFilterMatchTokens
+        """A list of ranking attributes to apply."""
+        rankings: [PairRanking]
+        """The maximum number of pairs to return."""
+        limit: Int
+        """Where in the list the server should start when returning items. Use `count`+`offset` from the previous query to request the next page of results."""
+        offset: Int
+    ): PairFilterConnection
+    """Filter DEX exchanges with filtering by network and addresses. Supports ranking and search."""
+    filterExchanges(
+        """A set of filters to apply."""
+        filters: ExchangeFilters
+        """A phrase to search for. Can match an exchange address or ID (`address:networkId`), or partially match an exchange name."""
+        phrase: String
+        """A list of ranking attributes to apply."""
+        rankings: [ExchangeRanking]
+        """The maximum number of exchanges to return."""
+        limit: Int
+        """Where in the list the server should start when returning items. Use `count`+`offset` from the previous query to request the next page of results."""
+        offset: Int
+    ): ExchangeFilterConnection
+    """Get time-series bucketed statistics for a DEX pair (price, volume, liquidity, transactions) with configurable window sizes. Use getDetailedPairStats instead for more options."""
+    getDetailedStats(
+        """The ID of the pair (`address:networkId`)."""
+        pairId: String!
+        """The token of interest used to calculate token-specific stats for the pair. Can be `token0` or `token1`."""
+        tokenOfInterest: TokenOfInterest
+        """The unix timestamp for the stats. Defaults to current."""
+        timestamp: Int
+        """The list of window sizes to get detailed stats for."""
+        windowSizes: [DetailedStatsWindowSize]
+        """The number of aggregated values to receive. Note: Each duration has predetermined bucket sizes. The first n-1 buckets are historical. The last bucket is a snapshot of current data. duration `day1`: 6 buckets (4 hours each) plus 1 partial bucket duration `hour12`: 12 buckets (1 hour each) plus 1 partial bucket duration `hour4`: 8 buckets (30 min each) plus 1 partial bucket duration `hour1`: 12 buckets (5 min each) plus 1 partial bucket duration `min5`: 5 buckets (1 min each) plus 1 partial bucket For example, requesting 11 buckets for a `min5` duration will return the last 10 minutes worth of data plus a snapshot for the current minute."""
+        bucketCount: Int
+        """The type of statistics returned. Can be `FILTERED` or `UNFILTERED`. Default is `UNFILTERED`."""
+        statsType: TokenPairStatisticsType
+    ): DetailedStats @deprecated(reason: "Use `getDetailedPairStats` instead, it has more resolutions and better support")
+    """Get time-series bucketed statistics for a DEX pair with more duration options than getDetailedStats. Returns OHLCV-like data for charting."""
+    getDetailedPairStats(
+        """The contract address of the pair."""
+        pairAddress: String!
+        """The network ID the pair is deployed on."""
+        networkId: Int!
+        """The token of interest used to calculate token-specific stats for the pair. Can be `token0` or `token1`."""
+        tokenOfInterest: TokenOfInterest
+        """The unix timestamp for the stats. Defaults to current."""
+        timestamp: Int
+        """The list of durations to get detailed pair stats for."""
+        durations: [DetailedPairStatsDuration]
+        """The number of aggregated values to receive. Note: Each duration has predetermined bucket sizes. The first n-1 buckets are historical. The last bucket is a snapshot of current data. duration `day1`: 6 buckets (4 hours each) plus 1 partial bucket duration `hour12`: 12 buckets (1 hour each) plus 1 partial bucket duration `hour4`: 8 buckets (30 min each) plus 1 partial bucket duration `hour1`: 12 buckets (5 min each) plus 1 partial bucket duration `min5`: 5 buckets (1 min each) plus 1 partial bucket For example, requesting 11 buckets for a `min5` duration will return the last 10 minutes worth of data plus a snapshot for the current minute."""
+        bucketCount: Int
+        """The type of statistics returned. Can be `FILTERED` or `UNFILTERED`. Default is `UNFILTERED`."""
+        statsType: TokenPairStatisticsType
+    ): DetailedPairStats
+    """Batch request time-series statistics for multiple pairs in a single request. More efficient than multiple getDetailedPairStats calls."""
+    getDetailedPairsStats(
+        input: [GetDetailedPairsStatsInput!]!
+    ): [DetailedPairStats]
+    """Get trending tokens by volume over a specified time resolution. DEPRECATED: Use filterTokens with volume-based ranking instead."""
+    listTopTokens(
+        """The maximum number of tokens to return. Max is `50`."""
+        limit: Int
+        """The list of network IDs to filter by."""
+        networkFilter: [Int!]
+        """The time frame for trending results. Can be `1`, `5`, `15`, `30`, `60`, `240`, `720`, or `1D`."""
+        resolution: String
+    ): [TokenWithMetadata!] @deprecated(reason: "This query is no longer supported and will not return up to date data. Use `filterTokens` instead.")
+    """Get metadata for a single token by address and network ID. Returns enhanced token info including price, liquidity, and market stats."""
+    token(
+        """Input for a token ID."""
+        input: TokenInput!
+    ): EnhancedToken!
+    """Get metadata for multiple tokens by address and network ID in a single request. Useful for batch token lookups."""
+    tokens(
+        """A list of token ID input."""
+        ids: [TokenInput!]
+    ): [EnhancedToken]!
+    """Get metadata and statistics for a DEX pair including token info and market data."""
+    pairMetadata(
+        """The ID of the pair (`address:networkId`)."""
+        pairId: String!
+        """The token of interest within the pair. Can be `token0` or `token1`."""
+        quoteToken: QuoteToken
+        """The type of statistics returned. Can be `FILTERED` or `UNFILTERED`. Default is `UNFILTERED`."""
+        statsType: TokenPairStatisticsType
+    ): PairMetadata!
+    """Get newly created trading pairs. DEPRECATED: Use filterPairs with createdAt DESC sorting instead."""
+    getLatestPairs(
+        """The maximum number of tokens to return."""
+        limit: Int
+        """The list of network IDs to filter by."""
+        networkFilter: [Int!]
+        """The list of exchanges to filter by."""
+        exchangeFilter: [String!]
+        """The minimum amount of liquidity to filter by."""
+        minLiquidityFilter: Int
+        """The cursor to use for pagination."""
+        cursor: String
+    ): LatestPairConnection @deprecated(reason: "This query is longer supported. Instead use filterPairs with sort order on createdAt DESC")
+    """Get all trading pairs that contain a specific token. Useful for finding liquidity/venue for a token."""
+    listPairsForToken(
+        """The maximum number of pairs to return."""
+        limit: Int
+        """The network ID the token is deployed on."""
+        networkId: Int!
+        """The contract address of the token."""
+        tokenAddress: String!
+    ): [Pair]!
+    """Get trading pairs for a token with enhanced metadata including statistics."""
+    listPairsWithMetadataForToken(
+        """The maximum number of pairs to return."""
+        limit: Int
+        """The network ID the token is deployed on."""
+        networkId: Int!
+        """The contract address of the token."""
+        tokenAddress: String!
+    ): ListPairsForTokenResponse!
+    """Get newly listed tokens. DEPRECATED: Use filterTokens with createdAt DESC sorting instead."""
+    getLatestTokens(
+        """The maximum number of tokens to return. Maximum number of tokens is 50."""
+        limit: Int
+        """The list of network IDs to filter by."""
+        networkFilter: [Int!]
+        """The offset to use for pagination."""
+        offset: Int
+    ): LatestTokenConnection @deprecated(reason: "This query is no longer supported. Use `filterTokens` with a createdAt: DESC filter instead.")
+
+    #PRICE & CHARTING QUERIES
+    #────────────────────────
+
+    """Get TradingView-compatible charting metadata for a pair including symbol info, supported resolutions, and exchange data."""
+    getSymbol(
+        """The ID of the pair (`address:networkId`)."""
+        symbol: String!
+        """The currency to use for the response. Can be `USD` (default) or `TOKEN`."""
+        currencyCode: String
+    ): SymbolResponse
+    """Get aggregated statistics for a network including total liquidity, volume, and pair counts."""
+    getNetworkStats(
+        """The network Id to filter by."""
+        networkId: Int!
+        """The exchange address to filter by (optional)."""
+        exchangeAddress: String
+    ): GetNetworkStatsResponse
+    """Get real-time or historical prices for multiple tokens in a single batch request. Max 25 tokens per request."""
+    getTokenPrices(
+        """A list of `GetPriceInput`s. Accepts a maximum of 25 inputs (anything over will be truncated)."""
+        inputs: [GetPriceInput]
+    ): [Price]
+    """Get OHLCV bar data for price charting. Supports multiple timeframes and returns open, high, low, close, volume data with timestamps."""
+    getTokenBars(
+        """The ID of the pair or token (`pairAddress:networkId` or `tokenAddress:networkId`). If a token contract address is provided, the token's top pair is used. For example, `0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2:1` returns WETH's top pair on Ethereum."""
+        symbol: String!
+        """The unix timestamp for the start of the requested range."""
+        from: Int!
+        """The unix timestamp for the end of the requested range."""
+        to: Int!
+        """The time frame for each candle. Available options are `1S`, `5S`, `15S`, `30S`, `1`, `5`, `15`, `30`, `60`, `240`, `720`, `1D`, `7D`. Resolutions lower than 1 minute are only updated for the last 24 hours due to the volume of data produced."""
+        resolution: String!
+        """The currency to use for the response. Can be `USD` or `TOKEN`. Default is `USD`. Use `currencyCode: TOKEN` for native token pricing."""
+        currencyCode: QuoteCurrency
+        """Whether to remove leading null values from the response. Default is `false`. To fetch a token's entire history, set resolution to `1D`, `from` value to `0` and `removeLeadingNullValues` to `true`."""
+        removeLeadingNullValues: Boolean
+        """Whether to remove empty bars from the response. This is useful for eliminating gaps in low-activity tokens. Default is `false`."""
+        removeEmptyBars: Boolean
+        """The type of statistics returned. Can be `FILTERED` or `UNFILTERED`. Default is `UNFILTERED`."""
+        statsType: TokenPairStatisticsType
+        """Guarantees number of bars returned is at most this number. Use `countback: 1500` with `from: 0` for maximum results."""
+        countback: Int
+    ): TokenBarsResponse
+    """Get OHLCV bar data for pairs or tokens with extended options including quote token selection and symbol type."""
+    getBars(
+        """The ID of the pair or token (`pairAddress:networkId` or `tokenAddress:networkId`). If a token contract address is provided, the token's top pair is used. For example, `0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2:1` returns WETH's top pair on Ethereum."""
+        symbol: String!
+        """The unix timestamp for the start of the requested range."""
+        from: Int!
+        """The unix timestamp for the end of the requested range."""
+        to: Int!
+        """The time frame for each candle. Available options are `1S`, `5S`, `15S`, `30S`, `1`, `5`, `15`, `30`, `60`, `240`, `720`, `1D`, `7D`. Resolutions lower than 1 minute are only updated for the last 24 hours due to the volume of data produced."""
+        resolution: String!
+        """The currency to use for the response. Can be `USD` or `TOKEN`. Default is `USD`. Use `currencyCode: TOKEN` for native token pricing."""
+        currencyCode: String
+        """Whether to remove leading null values from the response. Default is `false`. To fetch a token's entire history, set resolution to `1D`, `from` value to `0` and `removeLeadingNullValues` to `true`."""
+        removeLeadingNullValues: Boolean
+        """Whether to remove empty bars from the response. This is useful for eliminating gaps in low-activity tokens. Default is `false`."""
+        removeEmptyBars: Boolean
+        """The token of interest within the token's top pair. Can be `token0` or `token1`. If omitted, the base token is inferred automatically. You can invert the pair by quoting the other token."""
+        quoteToken: QuoteToken
+        """The type of statistics returned. Can be `FILTERED` or `UNFILTERED`. Default is `UNFILTERED`."""
+        statsType: TokenPairStatisticsType
+        """Guarantees number of bars returned is at most this number. Use `countback: 1500` with `from: 0` for maximum results."""
+        countback: Int
+        """Specify the type of symbol you want to fetch values for. Can be `TOKEN` or `POOL`."""
+        symbolType: SymbolType
+    ): BarsResponse
+    """Get sparkline (mini chart) data for multiple tokens. Useful for displaying small price charts in UI lists."""
+    tokenSparklines(
+        input: TokenSparklineInput!
+    ): [TokenSparkline!]!
+    """Generate chart URLs for external charting services. Returns URLs that can be embedded in iframes or opened directly."""
+    chartUrls(
+        """Input required to fetch a pair chart."""
+        input: ChartInput!
+    ): ChartUrlsResponse
+
+    #TOKEN EVENT & TRANSACTION QUERIES
+    #──────────────────────────────────
+
+    """Get swap/mint/burn events for DEX pairs with filtering by pair, tokens, maker, and time range. Supports cursor-based pagination."""
+    getTokenEvents(
+        """The maximum number of transactions to return."""
+        limit: Int
+        """The query filters to apply to the results."""
+        query: EventsQueryInput!
+        """The cursor to use for pagination."""
+        cursor: String
+        """The order to receive the token events. Can be `DESC` (default) or `ASC`."""
+        direction: RankingDirection
+    ): EventConnection
+    """Get events (swaps, mints, burns) for a specific maker (wallet) across all pairs. Useful for tracking trader activity."""
+    getTokenEventsForMaker(
+        """The maximum number of events to return."""
+        limit: Int
+        """The query filters to apply to the results."""
+        query: MakerEventsQueryInput!
+        """The cursor to use for pagination."""
+        cursor: String
+        """The order to receive the token events. Can be `DESC` (default) or `ASC`."""
+        direction: RankingDirection
+    ): MakerEventConnection
+    """Get event labels for a pair. Labels categorize events (e.g., 'Large Swap', 'Arbitrage') for easier analysis."""
+    getEventLabels(
+        """The ID of the pair (`address:networkId`)."""
+        id: String!
+        """The maximum number of event labels to return."""
+        limit: Int
+        """The cursor to use for pagination."""
+        cursor: String
+        """The order to receive the token event labels. Can be `DESC` (default) or `ASC`."""
+        direction: RankingDirection
+    ): EventLabelConnection
+    """Get token lifecycle events (mints, burns, large transfers) that indicate significant token activity."""
+    tokenLifecycleEvents(
+        """The maximum number of events to return."""
+        limit: Int
+        """The query filters to apply to the results."""
+        query: TokenLifecycleEventsQueryInput!
+        """The cursor to use for pagination."""
+        cursor: String
+    ): TokenLifecycleEventConnection
+    """Returns a single token by its address & network id."""
+    token(
+        """Input for a token ID."""
+        input: TokenInput!
+    ): EnhancedToken!
+    """Returns a list of tokens by their addresses & network id, with pagination."""
+    tokens(
+        """A list of token ID input."""
+        ids: [TokenInput!]
+    ): [EnhancedToken]!
+    """Returns metadata for a pair of tokens."""
+    pairMetadata(
+        """The ID of the pair (`address:networkId`)."""
+        pairId: String!
+        """The token of interest within the pair. Can be `token0` or `token1`."""
+        quoteToken: QuoteToken
+        """The type of statistics returned. Can be `FILTERED` or `UNFILTERED`. Default is `UNFILTERED`."""
+        statsType: TokenPairStatisticsType
+    ): PairMetadata!
+    """Returns new tokens listed over the last three days."""
+    getLatestPairs(
+        """The maximum number of tokens to return."""
+        limit: Int
+        """The list of network IDs to filter by."""
+        networkFilter: [Int!]
+        """The list of exchanges to filter by."""
+        exchangeFilter: [String!]
+        """The minimum amount of liquidity to filter by."""
+        minLiquidityFilter: Int
+        """The cursor to use for pagination."""
+        cursor: String
+    ): LatestPairConnection @deprecated(reason: "This query is longer supported. Instead use filterPairs with sort order on createdAt DESC")
+    """Returns a list of pairs containing a given token."""
+    listPairsForToken(
+        """The maximum number of pairs to return."""
+        limit: Int
+        """The network ID the token is deployed on."""
+        networkId: Int!
+        """The contract address of the token."""
+        tokenAddress: String!
+    ): [Pair]!
+    """Returns a list of pair metadata for a token."""
+    listPairsWithMetadataForToken(
+        """The maximum number of pairs to return."""
+        limit: Int
+        """The network ID the token is deployed on."""
+        networkId: Int!
+        """The contract address of the token."""
+        tokenAddress: String!
+    ): ListPairsForTokenResponse!
+    """Returns a list of token simple chart data (sparklines) for the given tokens."""
+    tokenSparklines(
+        input: TokenSparklineInput!
+    ): [TokenSparkline!]!
+    """Returns list of token balances that a wallet has."""
+    balances(
+        input: BalancesInput!
+    ): BalancesResponse!
+    """Returns list of wallets that hold a given token, ordered by holdings descending. Also has the unique count of holders for that token."""
+    holders(
+        input: HoldersInput!
+    ): HoldersResponse!
+    """Returns a list of latest tokens."""
+    getLatestTokens(
+        """The maximum number of tokens to return. Maximum number of tokens is 50."""
+        limit: Int
+        """The list of network IDs to filter by."""
+        networkFilter: [Int!]
+        """The offset to use for pagination."""
+        offset: Int
+    ): LatestTokenConnection @deprecated(reason: "This query is no longer supported. Use `filterTokens` with a createdAt: DESC filter instead.")
+    """Returns liquidity locks for a given pair."""
+    liquidityLocks(
+        """The address of the pair."""
+        pairAddress: String
+        """The address of the token."""
+        tokenAddress: String
+        """The network id of the pair."""
+        networkId: Int!
+        """A cursor for use in pagination."""
+        cursor: String
+    ): LiquidityLockConnection
+    """Returns liquidity metadata for a given pair. Includes liquidity lock data."""
+    liquidityMetadata(
+        """The address of the pair."""
+        pairAddress: String!
+        """The network id of the pair."""
+        networkId: Int!
+    ): LiquidityMetadata
+    """Returns liquidity metadata for a given token. Includes liquidity lock data for up to 100 pairs that the token is in."""
+    liquidityMetadataByToken(
+        """The address of the token."""
+        tokenAddress: String!
+        """The network id of the token."""
+        networkId: Int!
+    ): LiquidityMetadataByToken!
+
+    #WALLET QUERIES
+    #──────────────
+
+    """Get token balances for a wallet across all networks. Supports filtering by tokens and native balances."""
+    balances(
+        input: BalancesInput!
+    ): BalancesResponse!
+    """Get token holders for a specific token, ranked by holdings descending. Also returns total unique holder count."""
+    holders(
+        input: HoldersInput!
+    ): HoldersResponse!
+    """Filter wallets by performance metrics including volume, profit/loss, and transaction counts. Useful for finding profitable traders."""
+    filterWallets(
+        input: FilterWalletsInput!
+    ): WalletFilterConnection!
+    """Filter wallets with network-specific stats. DEPRECATED: Use filterWallets instead."""
+    filterNetworkWallets(
+        input: FilterNetworkWalletsInput!
+    ): NetworkWalletFilterConnection! @deprecated(reason: "Use filterWallets instead")
+    """Filter wallets that hold a specific token with balance and value filters."""
+    filterTokenWallets(
+        input: FilterTokenWalletsInput!
+    ): TokenWalletFilterConnection!
+    """Get detailed statistics for a wallet including trading performance, profit/loss, and activity metrics."""
+    detailedWalletStats(
+        input: DetailedWalletStatsInput!
+    ): DetailedWalletStats
+    """Get wallet activity chart data showing trading behavior over time."""
+    walletChart(
+        input: WalletChartInput!
+    ): WalletChartResponse
+    """Check the status of a wallet backfill operation. Backfills are triggered to populate historical wallet data."""
+    walletAggregateBackfillState(
+        input: WalletAggregateBackfillStateInput!
+    ): WalletAggregateBackfillStateResponse!
+    """Get top traders for a specific token ranked by performance metrics."""
+    tokenTopTraders(
+        input: TokenTopTradersInput!
+    ): TokenTopTradersConnection!
+
+    #EXCHANGE & MISC QUERIES
+    #────────────────────────
+
+    """Get all supported DEX exchanges with their metadata."""
+    getExchanges(
+        """Get exchanges with missing fields. Default is `false`."""
+        showNameless: Boolean
+    ): [Exchange!]!
+    """Get the percentage of a token's total supply held by its top 10 holders. Useful for measuring token concentration."""
+    top10HoldersPercent(
+        tokenId: String!
+    ): Float
+    """Get community notes for addresses/pairs. Community notes are user-contributed information about tokens or pairs."""
+    getCommunityNotes(
+        input: CommunityNotesInput
+    ): CommunityNotesResponse!
+}
