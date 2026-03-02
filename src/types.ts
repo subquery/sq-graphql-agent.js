@@ -39,7 +39,7 @@ export interface GraphQLAnalysisResult {
   domainName: string;
   domainCapabilities: string[];
   declineMessage: string;
-  // suggestedQuestions: string[];
+  suggestedQuestions: string[];
 }
 
 export interface GraphQLProjectConfigInput {
@@ -58,6 +58,7 @@ export interface GraphQLProjectConfig extends GraphQLProjectConfigInput {
   domainName: string;
   domainCapabilities: string[];
   declineMessage: string;
+  suggestedQuestions?: string[];
   // Cached introspection schema from endpoint
   introspectionSchema?: IntrospectionQuery;
   fullSchema?: string;
