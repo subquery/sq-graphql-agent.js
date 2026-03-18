@@ -20,6 +20,19 @@ async function fetchWithTimeout(url: string, init: RequestInit): Promise<Respons
   }
 }
 
+/**
+ * Check if the endpoint is a Codex GraphQL API endpoint.
+ * Strictly matches https://graph.codex.io/graphql
+ */
+export function isCodexEndpoint(endpoint: string): boolean {
+  try {
+    const url = new URL(endpoint);
+    return url.hostname.toLowerCase() === 'graph.codex.io';
+  } catch {
+    return false;
+  }
+}
+
 export async function fetchFromIPFS(rawPath: string): Promise<string> {
   const normalizedPath = rawPath
     .replace(/^ipfs:\/\//, '')

@@ -16,6 +16,7 @@ import {
   type GraphQLProjectConfig,
   type PersistentService,
 } from './types.js';
+import {isCodexEndpoint} from './utils.js';
 
 export function createGraphQLAgent(
   project: GraphQLProjectConfig,
@@ -59,9 +60,7 @@ export async function initializeProjectConfig(
   const authorization = customHeaders?.Authorization;
 
   // Check if this is Codex
-  const isCodex = endpoint.includes('codex.io') || endpoint.includes('codex');
-
-  if (isCodex) {
+  if (isCodexEndpoint(endpoint)) {
     // For Codex, use the bundled config directly (skip LLM analysis)
     logger?.info({endpoint}, 'Detected Codex endpoint, using bundled config');
     const config = getCodexConfig(endpoint, authorization);
