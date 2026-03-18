@@ -32,6 +32,9 @@ export function createGraphQLTypeDetailTool(
     return null;
   }
 
+  // Build type definitions cache once (scoped to this tool instance)
+  const typeDefs = buildTypeDefinitions(documentNode);
+
   return new DynamicStructuredTool({
     name: 'graphql_type_detail',
     description: `Get type definitions for multiple GraphQL types with configurable depth.
@@ -68,7 +71,7 @@ Input:
         const results: string[] = [];
 
         for (const typeName of typeNames) {
-          const result = extractTypeWithDepth(typeName, depth, documentNode);
+          const result = extractTypeWithDepth(typeName, depth, typeDefs);
 
           if (!result) {
             results.push(
@@ -94,46 +97,42 @@ type TypeDefinition = {
   typeName: string;
 };
 
-// Cache for type definitions to avoid repeated string extraction
-const typeCache = new Map<string, TypeDefinition>();
-
-function getAllTypeDefinitions(documentNode: DocumentNode): Map<string, TypeDefinition> {
-  if (typeCache.size > 0) {
-    return typeCache;
-  }
+// Build type definitions map from a document (no caching - caller should cache if needed)
+function buildTypeDefinitions(documentNode: DocumentNode): Map<string, TypeDefinition> {
+  const typeDefs = new Map<string, TypeDefinition>();
 
   for (const definition of documentNode.definitions) {
     if (definition.kind === 'ObjectTypeDefinition') {
       const name = definition.name.value;
-      typeCache.set(name, {
+      typeDefs.set(name, {
         node: definition,
         raw: definitionNodeToString(definition),
         typeName: name,
       });
     } else if (definition.kind === 'InterfaceTypeDefinition') {
       const name = definition.name.value;
-      typeCache.set(name, {
+      typeDefs.set(name, {
         node: definition,
         raw: definitionNodeToString(definition),
         typeName: name,
       });
     } else if (definition.kind === 'InputObjectTypeDefinition') {
       const name = definition.name.value;
-      typeCache.set(name, {
+      typeDefs.set(name, {
         node: definition,
         raw: definitionNodeToString(definition),
         typeName: name,
       });
     } else if (definition.kind === 'EnumTypeDefinition') {
       const name = definition.name.value;
-      typeCache.set(name, {
+      typeDefs.set(name, {
         node: definition,
         raw: definitionNodeToString(definition),
         typeName: name,
       });
     } else if (definition.kind === 'UnionTypeDefinition') {
       const name = definition.name.value;
-      typeCache.set(name, {
+      typeDefs.set(name, {
         node: definition,
         raw: definitionNodeToString(definition),
         typeName: name,
@@ -141,7 +140,7 @@ function getAllTypeDefinitions(documentNode: DocumentNode): Map<string, TypeDefi
     }
   }
 
-  return typeCache;
+  return typeDefs;
 }
 
 function definitionNodeToString(node: DefinitionNode): string {
@@ -280,7 +279,7 @@ function valueNodeToString(value: {value?: boolean | string | number; kind?: str
 function extractTypeWithDepth(
   typeName: string,
   maxDepth: number,
-  documentNode: DocumentNode,
+  typeDefs: Map<string, TypeDefinition>,
   visited: Set<string> = new Set(),
   currentDepth = 0
 ): string | null {
@@ -315,7 +314,6 @@ function extractTypeWithDepth(
 
   visited.add(typeName);
 
-  const typeDefs = getAllTypeDefinitions(documentNode);
   const typeDef = typeDefs.get(typeName);
 
   if (!typeDef) {
@@ -329,7 +327,7 @@ function extractTypeWithDepth(
     const nestedTypes: string[] = [];
 
     for (const refType of referencedTypes) {
-      const nested = extractTypeWithDepth(refType, maxDepth, documentNode, visited, currentDepth + 1);
+      const nested = extractTypeWithDepth(refType, maxDepth, typeDefs, visited, currentDepth + 1);
       if (nested) {
         nestedTypes.push(nested);
       }
