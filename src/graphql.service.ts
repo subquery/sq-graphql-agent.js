@@ -1,5 +1,5 @@
-// Copyright 2020-2025 SubQuery Pte Ltd authors & contributors
-// SPDX-License-Identifier: GPL-3.0
+// Copyright 2020-2026 SubQuery Pte Ltd authors & contributors
+// SPDX-License-Identifier: PolyForm-Shield-1.0.0
 
 import {GraphQLSchema, buildSchema, buildClientSchema, parse, validate, type IntrospectionQuery} from 'graphql';
 import {type Logger} from 'pino';

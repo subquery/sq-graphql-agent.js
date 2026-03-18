@@ -1,5 +1,5 @@
-// Copyright 2020-2025 SubQuery Pte Ltd authors & contributors
-// SPDX-License-Identifier: GPL-3.0
+// Copyright 2020-2026 SubQuery Pte Ltd authors & contributors
+// SPDX-License-Identifier: PolyForm-Shield-1.0.0
 
 import {BaseMessage, HumanMessage, isAIMessage, SystemMessage} from '@langchain/core/messages';
 import {createReactAgent} from '@langchain/langgraph/prebuilt';
@@ -33,7 +33,7 @@ export function createGraphQLAgent(
   const service = new GraphQLService(project, true, logger);
   const tools = createGraphQLTools(service, project, logger);
   const agent = createReactAgent({llm, tools}).withConfig({
-    recursionLimit: 10,
+    recursionLimit: 30,
   });
 
   return {

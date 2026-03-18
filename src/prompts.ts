@@ -1,5 +1,5 @@
-// Copyright 2020-2025 SubQuery Pte Ltd authors & contributors
-// SPDX-License-Identifier: GPL-3.0
+// Copyright 2020-2026 SubQuery Pte Ltd authors & contributors
+// SPDX-License-Identifier: PolyForm-Shield-1.0.0
 
 import {GraphqlProvider, type GraphQLProjectConfig} from './types.js';
 
@@ -30,6 +30,15 @@ ${verbose >= 2 ? '- Explain your query construction strategy and any optimizatio
 - Example: If you want to call getNftPool, first call graphql_type_detail with typeName: "NftPoolResponse"
 - Use the returned type definition to construct valid queries with correct fields and arguments
 - Queries generated need to be valid graphql query with curly braces and all, not pseudo-code or partial queries.
+
+📊 SORTING IS MANDATORY FOR LIST QUERIES:
+- Codex queries ALWAYS have limited results (default: 10)
+- ALWAYS add proper sorting to ensure the MOST RELEVANT results are returned
+- Without sorting, you may miss the actual data the user is looking for
+- Sorting with \`rankings\` parameter is ONLY available on \`filter*\` queries (e.g., filterPairs, filterPools, filterTokens)
+- Syntax: \`filterPairs(rankings: {attribute: "<field>", direction: ASC|DESC}) { ... }\`
+- When asking for "top", "best", "highest", "lowest" - sorting is REQUIRED
+- When asking for recent data - sort by timestamp DESC
 `
     : '';
 

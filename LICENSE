@@ -1,0 +1,56 @@
+Polyform Shield License 1.0.0
+
+Copyright (c) 2024-2026 SubQuery Network
+
+This license applies to the software "sq-graphql-agent" and all associated source files.
+
+Terms and Conditions:
+
+1. Definitions
+
+   "Licensor" means the copyright holder of the software.
+   "Software" means the software licensed under this license.
+   "You" means any person or entity exercising permissions granted by this license.
+   "Competing Use" means any use of the Software in or for a commercial product or service that competes with the Licensor's product or service offerings, including but not limited to:
+   - Providing the Software as a hosted or managed service (SaaS, PaaS, IaaS, or similar)
+   - Offering the Software as part of a cloud computing platform
+   - Using the Software to provide data indexing, querying, or analytics services to third parties
+   - Any other commercial use that directly or indirectly competes with the Licensor's business
+
+2. Grant of License
+
+   Subject to the terms of this license, the Licensor hereby grants You a worldwide, royalty-free, non-exclusive license to:
+
+   a) Use the Software for non-commercial purposes, including personal, educational, and research purposes.
+   b) Use the Software for internal business purposes, provided such use does not constitute a Competing Use.
+   c) Modify the Software for Your own internal use, provided such use does not constitute a Competing Use.
+   d) Distribute copies of the Software to others, subject to the condition that recipients also agree to be bound by this license.
+
+3. Restrictions
+
+   a) You may not use the Software for any Competing Use without prior written authorization from the Licensor.
+   b) You may not sublicense, sell, rent, lease, or otherwise transfer rights to the Software for Competing Uses without prior written authorization from the Licensor.
+   c) You must retain all copyright notices, this license, and any other proprietary notices in all copies of the Software.
+   d) You must include a copy of this license with any distribution of the Software.
+
+4. Commercial Licensing
+
+   For Commercial Use, including but not limited to SaaS, cloud services, and other competitive offerings, You must obtain a separate commercial license from the Licensor. Please contact the Licensor at licensing@subquery.network for commercial licensing options.
+
+5. Intellectual Property
+
+   This license does not grant You any rights to use the trademarks, service marks, or logos of the Licensor, except as reasonably necessary to describe the origin of the Software.
+
+6. Disclaimer of Warranty
+
+   THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE LICENSOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+7. Termination
+
+   This license and the rights granted hereunder will terminate automatically upon any breach by You of the terms of this license. Upon termination, You must cease all use, modification, and distribution of the Software.
+
+8. Miscellaneous
+
+   a) This license represents the complete agreement concerning the subject matter hereof.
+   b) If any provision of this license is held to be unenforceable, the remaining provisions shall remain in effect.
+   c) This license shall be governed by the laws of the jurisdiction in which the Licensor resides.
