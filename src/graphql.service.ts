@@ -197,6 +197,13 @@ export class GraphQLService {
       if (!introspectionData) {
         introspectionData = await this.fetchIntrospectionSchema();
       }
+      // Validate introspection payload before building schema
+      if (!introspectionData || !introspectionData.__schema) {
+        throw new Error(
+          `Invalid introspection response from ${this.config.endpoint}: missing __schema in response. ` +
+            `The endpoint may have returned an error or introspection is disabled.`
+        );
+      }
       schema = buildClientSchema(introspectionData);
     }
 
