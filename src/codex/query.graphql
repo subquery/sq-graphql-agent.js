@@ -563,14 +563,6 @@ type Query {
         """The cursor to use for pagination."""
         cursor: String
     ): TokenLifecycleEventConnection
-    """Returns list of token balances that a wallet has."""
-    balances(
-        input: BalancesInput!
-    ): BalancesResponse!
-    """Returns list of wallets that hold a given token, ordered by holdings descending. Also has the unique count of holders for that token."""
-    holders(
-        input: HoldersInput!
-    ): HoldersResponse!
     """Returns liquidity locks for a given pair."""
     liquidityLocks(
         """The address of the pair."""
