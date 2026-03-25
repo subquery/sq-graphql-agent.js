@@ -241,7 +241,12 @@ function fieldNodeToString(field: FieldDefinitionNode): string {
   return parts.join('');
 }
 
-function inputFieldNodeToString(field: {name: {value: string}; type: TypeNode; description?: {value: string}}): string {
+function inputFieldNodeToString(field: {
+  name: {value: string};
+  type: TypeNode;
+  description?: {value: string};
+  defaultValue?: {value?: boolean | string | number; kind?: string};
+}): string {
   const parts: string[] = [];
 
   if (field.description) {
@@ -249,6 +254,10 @@ function inputFieldNodeToString(field: {name: {value: string}; type: TypeNode; d
   }
 
   parts.push(`${field.name.value}: ${typeNodeToString(field.type)}`);
+
+  if (field.defaultValue) {
+    parts.push(` = ${valueNodeToString(field.defaultValue)}`);
+  }
 
   return parts.join('');
 }
@@ -295,7 +304,6 @@ function extractTypeWithDepth(
       'Int',
       'Float',
       'Boolean',
-      'Int',
       'Query',
       'Mutation',
       'Subscription',

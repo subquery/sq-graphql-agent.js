@@ -33,6 +33,22 @@ export function isCodexEndpoint(endpoint: string): boolean {
   }
 }
 
+/**
+ * Get a header value from a headers object with case-insensitive lookup.
+ * HTTP headers are case-insensitive per RFC 7230.
+ */
+export function getHeader(headers: Record<string, string> | undefined, name: string): string | undefined {
+  if (!headers) return undefined;
+
+  const lowerName = name.toLowerCase();
+  for (const key of Object.keys(headers)) {
+    if (key.toLowerCase() === lowerName) {
+      return headers[key];
+    }
+  }
+  return undefined;
+}
+
 export async function fetchFromIPFS(rawPath: string): Promise<string> {
   const normalizedPath = rawPath
     .replace(/^ipfs:\/\//, '')

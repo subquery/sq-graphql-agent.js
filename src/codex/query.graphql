@@ -382,21 +382,6 @@ type Query {
         """Where in the list the server should start when returning items. Use `count`+`offset` from the previous query to request the next page of results."""
         offset: Int
     ): ExchangeFilterConnection
-    """Get time-series bucketed statistics for a DEX pair (price, volume, liquidity, transactions) with configurable window sizes. Use getDetailedPairStats instead for more options."""
-    getDetailedStats(
-        """The ID of the pair (`address:networkId`)."""
-        pairId: String!
-        """The token of interest used to calculate token-specific stats for the pair. Can be `token0` or `token1`."""
-        tokenOfInterest: TokenOfInterest
-        """The unix timestamp for the stats. Defaults to current."""
-        timestamp: Int
-        """The list of window sizes to get detailed stats for."""
-        windowSizes: [DetailedStatsWindowSize]
-        """The number of aggregated values to receive. Note: Each duration has predetermined bucket sizes. The first n-1 buckets are historical. The last bucket is a snapshot of current data. duration `day1`: 6 buckets (4 hours each) plus 1 partial bucket duration `hour12`: 12 buckets (1 hour each) plus 1 partial bucket duration `hour4`: 8 buckets (30 min each) plus 1 partial bucket duration `hour1`: 12 buckets (5 min each) plus 1 partial bucket duration `min5`: 5 buckets (1 min each) plus 1 partial bucket For example, requesting 11 buckets for a `min5` duration will return the last 10 minutes worth of data plus a snapshot for the current minute."""
-        bucketCount: Int
-        """The type of statistics returned. Can be `FILTERED` or `UNFILTERED`. Default is `UNFILTERED`."""
-        statsType: TokenPairStatisticsType
-    ): DetailedStats @deprecated(reason: "Use `getDetailedPairStats` instead, it has more resolutions and better support")
     """Get time-series bucketed statistics for a DEX pair with more duration options than getDetailedStats. Returns OHLCV-like data for charting."""
     getDetailedPairStats(
         """The contract address of the pair."""
@@ -418,16 +403,6 @@ type Query {
     getDetailedPairsStats(
         input: [GetDetailedPairsStatsInput!]!
     ): [DetailedPairStats]
-    """Get trending tokens by volume over a specified time resolution. DEPRECATED: Use filterTokens with volume-based ranking instead."""
-    listTopTokens(
-        """The maximum number of tokens to return. Max is `50`."""
-        limit: Int
-        """The list of network IDs to filter by."""
-        networkFilter: [Int!]
-        """The time frame for trending results. Can be `1`, `5`, `15`, `30`, `60`, `240`, `720`, or `1D`."""
-        resolution: String
-    ): [TokenWithMetadata!] @deprecated(reason: "This query is no longer supported and will not return up to date data. Use `filterTokens` instead.")
-    """Get metadata for a single token by address and network ID. Returns enhanced token info including price, liquidity, and market stats."""
     token(
         """Input for a token ID."""
         input: TokenInput!
@@ -446,19 +421,6 @@ type Query {
         """The type of statistics returned. Can be `FILTERED` or `UNFILTERED`. Default is `UNFILTERED`."""
         statsType: TokenPairStatisticsType
     ): PairMetadata!
-    """Get newly created trading pairs. DEPRECATED: Use filterPairs with createdAt DESC sorting instead."""
-    getLatestPairs(
-        """The maximum number of tokens to return."""
-        limit: Int
-        """The list of network IDs to filter by."""
-        networkFilter: [Int!]
-        """The list of exchanges to filter by."""
-        exchangeFilter: [String!]
-        """The minimum amount of liquidity to filter by."""
-        minLiquidityFilter: Int
-        """The cursor to use for pagination."""
-        cursor: String
-    ): LatestPairConnection @deprecated(reason: "This query is longer supported. Instead use filterPairs with sort order on createdAt DESC")
     """Get all trading pairs that contain a specific token. Useful for finding liquidity/venue for a token."""
     listPairsForToken(
         """The maximum number of pairs to return."""
@@ -477,15 +439,6 @@ type Query {
         """The contract address of the token."""
         tokenAddress: String!
     ): ListPairsForTokenResponse!
-    """Get newly listed tokens. DEPRECATED: Use filterTokens with createdAt DESC sorting instead."""
-    getLatestTokens(
-        """The maximum number of tokens to return. Maximum number of tokens is 50."""
-        limit: Int
-        """The list of network IDs to filter by."""
-        networkFilter: [Int!]
-        """The offset to use for pagination."""
-        offset: Int
-    ): LatestTokenConnection @deprecated(reason: "This query is no longer supported. Use `filterTokens` with a createdAt: DESC filter instead.")
 
     #PRICE & CHARTING QUERIES
     #────────────────────────
@@ -610,60 +563,6 @@ type Query {
         """The cursor to use for pagination."""
         cursor: String
     ): TokenLifecycleEventConnection
-    """Returns a single token by its address & network id."""
-    token(
-        """Input for a token ID."""
-        input: TokenInput!
-    ): EnhancedToken!
-    """Returns a list of tokens by their addresses & network id, with pagination."""
-    tokens(
-        """A list of token ID input."""
-        ids: [TokenInput!]
-    ): [EnhancedToken]!
-    """Returns metadata for a pair of tokens."""
-    pairMetadata(
-        """The ID of the pair (`address:networkId`)."""
-        pairId: String!
-        """The token of interest within the pair. Can be `token0` or `token1`."""
-        quoteToken: QuoteToken
-        """The type of statistics returned. Can be `FILTERED` or `UNFILTERED`. Default is `UNFILTERED`."""
-        statsType: TokenPairStatisticsType
-    ): PairMetadata!
-    """Returns new tokens listed over the last three days."""
-    getLatestPairs(
-        """The maximum number of tokens to return."""
-        limit: Int
-        """The list of network IDs to filter by."""
-        networkFilter: [Int!]
-        """The list of exchanges to filter by."""
-        exchangeFilter: [String!]
-        """The minimum amount of liquidity to filter by."""
-        minLiquidityFilter: Int
-        """The cursor to use for pagination."""
-        cursor: String
-    ): LatestPairConnection @deprecated(reason: "This query is longer supported. Instead use filterPairs with sort order on createdAt DESC")
-    """Returns a list of pairs containing a given token."""
-    listPairsForToken(
-        """The maximum number of pairs to return."""
-        limit: Int
-        """The network ID the token is deployed on."""
-        networkId: Int!
-        """The contract address of the token."""
-        tokenAddress: String!
-    ): [Pair]!
-    """Returns a list of pair metadata for a token."""
-    listPairsWithMetadataForToken(
-        """The maximum number of pairs to return."""
-        limit: Int
-        """The network ID the token is deployed on."""
-        networkId: Int!
-        """The contract address of the token."""
-        tokenAddress: String!
-    ): ListPairsForTokenResponse!
-    """Returns a list of token simple chart data (sparklines) for the given tokens."""
-    tokenSparklines(
-        input: TokenSparklineInput!
-    ): [TokenSparkline!]!
     """Returns list of token balances that a wallet has."""
     balances(
         input: BalancesInput!
@@ -672,15 +571,6 @@ type Query {
     holders(
         input: HoldersInput!
     ): HoldersResponse!
-    """Returns a list of latest tokens."""
-    getLatestTokens(
-        """The maximum number of tokens to return. Maximum number of tokens is 50."""
-        limit: Int
-        """The list of network IDs to filter by."""
-        networkFilter: [Int!]
-        """The offset to use for pagination."""
-        offset: Int
-    ): LatestTokenConnection @deprecated(reason: "This query is no longer supported. Use `filterTokens` with a createdAt: DESC filter instead.")
     """Returns liquidity locks for a given pair."""
     liquidityLocks(
         """The address of the pair."""
@@ -722,10 +612,6 @@ type Query {
     filterWallets(
         input: FilterWalletsInput!
     ): WalletFilterConnection!
-    """Filter wallets with network-specific stats. DEPRECATED: Use filterWallets instead."""
-    filterNetworkWallets(
-        input: FilterNetworkWalletsInput!
-    ): NetworkWalletFilterConnection! @deprecated(reason: "Use filterWallets instead")
     """Filter wallets that hold a specific token with balance and value filters."""
     filterTokenWallets(
         input: FilterTokenWalletsInput!
