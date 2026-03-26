@@ -1,7 +1,7 @@
-// Copyright 2020-2025 SubQuery Pte Ltd authors & contributors
-// SPDX-License-Identifier: GPL-3.0
+// Copyright 2020-2026 SubQuery Pte Ltd authors & contributors
+// SPDX-License-Identifier: PolyForm-Shield-1.0.0
 
-import {GraphQLSchema, buildClientSchema, parse, validate, type IntrospectionQuery} from 'graphql';
+import {GraphQLSchema, buildSchema, buildClientSchema, parse, validate, type IntrospectionQuery} from 'graphql';
 import {type Logger} from 'pino';
 import type {GraphQLProjectConfig} from './types.js';
 
@@ -188,12 +188,24 @@ export class GraphQLService {
     }
 
     let schema: GraphQLSchema;
-    let introspectionData = this.config.introspectionSchema;
-    if (!introspectionData) {
-      introspectionData = await this.fetchIntrospectionSchema();
+    if (this.config.fullSchema) {
+      // Parse from full GraphQL SDL schema string
+      schema = buildSchema(this.config.fullSchema);
+    } else {
+      // Fallback to introspection schema
+      let introspectionData = this.config.introspectionSchema;
+      if (!introspectionData) {
+        introspectionData = await this.fetchIntrospectionSchema();
+      }
+      // Validate introspection payload before building schema
+      if (!introspectionData || !introspectionData.__schema) {
+        throw new Error(
+          `Invalid introspection response from ${this.config.endpoint}: missing __schema in response. ` +
+            `The endpoint may have returned an error or introspection is disabled.`
+        );
+      }
+      schema = buildClientSchema(introspectionData);
     }
-
-    schema = buildClientSchema(introspectionData);
 
     this.schemaCache.set(key, schema);
     return schema;

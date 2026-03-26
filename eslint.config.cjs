@@ -108,15 +108,15 @@ module.exports = defineConfig([
           source: 'string',
           style: 'line',
           variables: {
-            year: '2020-2025',
+            year: '2020-2026',
           },
           patterns: {
             year: {
               pattern: '\\d{4}(-\\d{4})?',
-              defaultValue: '2020-2025',
+              defaultValue: '2020-2026',
             },
           },
-          content: 'Copyright {year} SubQuery Pte Ltd authors & contributors\nSPDX-License-Identifier: GPL-3.0',
+          content: 'Copyright {year} SubQuery Pte Ltd authors & contributors\nSPDX-License-Identifier: PolyForm-Shield-1.0.0',
         },
       ],
 

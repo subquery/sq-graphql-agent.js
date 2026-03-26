@@ -1,5 +1,5 @@
-// Copyright 2020-2025 SubQuery Pte Ltd authors & contributors
-// SPDX-License-Identifier: GPL-3.0
+// Copyright 2020-2026 SubQuery Pte Ltd authors & contributors
+// SPDX-License-Identifier: PolyForm-Shield-1.0.0
 
 import OpenAI from 'openai';
 import type {GraphQLAgentConfig, GraphQLAnalysisResult, ProjectManifest} from './types.js';
@@ -27,10 +27,11 @@ Respond with JSON matching:
 {
   "domain_name": "Project name",
   "domain_capabilities": ["..."], // A list of specific capabilities or topics this project can answer questions about.
-  "decline_message": "A message explaining what is out of scope for this project."
+  "decline_message": "A message explaining what is out of scope for this project.",
+  "suggested_questions": ["..."] // A list of 3-5 example questions users can ask about this project.
 }
 
-Ensure capabilities reference actual schema entities.`;
+Ensure capabilities and suggested questions reference actual schema entities.`;
 }
 
 export async function analyzeProjectWithLLM(
@@ -72,6 +73,9 @@ function parseAnalysis(text: string): GraphQLAnalysisResult {
   const domainCapabilities = Array.isArray(parsed.domain_capabilities)
     ? parsed.domain_capabilities.filter((item: unknown) => typeof item === 'string')
     : [];
+  const suggestedQuestions = Array.isArray(parsed.suggested_questions)
+    ? parsed.suggested_questions.filter((item: unknown) => typeof item === 'string')
+    : [];
 
   if (!domainName || !declineMessage || domainCapabilities.length === 0) {
     throw new Error('Incomplete analysis data');
@@ -81,6 +85,7 @@ function parseAnalysis(text: string): GraphQLAnalysisResult {
     domainName,
     domainCapabilities,
     declineMessage,
+    suggestedQuestions,
   };
 }
 

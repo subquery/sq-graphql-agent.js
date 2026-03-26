@@ -1,10 +1,11 @@
-// Copyright 2020-2025 SubQuery Pte Ltd authors & contributors
-// SPDX-License-Identifier: GPL-3.0
+// Copyright 2020-2026 SubQuery Pte Ltd authors & contributors
+// SPDX-License-Identifier: PolyForm-Shield-1.0.0
 
 import {BaseMessage, HumanMessage, isAIMessage, SystemMessage} from '@langchain/core/messages';
 import {createReactAgent} from '@langchain/langgraph/prebuilt';
 import {ChatOpenAI} from '@langchain/openai';
 import type {Logger} from 'pino';
+import {getCodexConfig} from './codex/config.js';
 import {GraphQLService} from './graphql.service.js';
 import {ProjectManager} from './project-manager.js';
 import {buildSystemPrompt} from './prompts.js';
@@ -15,6 +16,7 @@ import {
   type GraphQLProjectConfig,
   type PersistentService,
 } from './types.js';
+import {getHeader, isCodexEndpoint} from './utils.js';
 
 export function createGraphQLAgent(
   project: GraphQLProjectConfig,
@@ -32,7 +34,7 @@ export function createGraphQLAgent(
   const service = new GraphQLService(project, true, logger);
   const tools = createGraphQLTools(service, project, logger);
   const agent = createReactAgent({llm, tools}).withConfig({
-    recursionLimit: 10,
+    recursionLimit: 30,
   });
 
   return {
@@ -55,7 +57,21 @@ export async function initializeProjectConfig(
   customHeaders?: Record<string, string>,
   logger?: Logger
 ): Promise<GraphQLProjectConfig> {
-  const authorization = customHeaders?.Authorization;
+  // Normalize authorization header (HTTP headers are case-insensitive)
+  const authorization = getHeader(customHeaders, 'authorization');
+
+  // Check if this is Codex
+  if (isCodexEndpoint(endpoint)) {
+    // For Codex, use the bundled config directly (skip LLM analysis)
+    logger?.info('Detected Codex endpoint, using bundled config');
+    const config = getCodexConfig(endpoint, authorization);
+
+    // Save to persistent service for caching
+    await persistentService.save(endpoint, config);
+    return config;
+  }
+
+  // For non-Codex endpoints, use the existing flow
   const graphqlService = new GraphQLService({endpoint, authorization} as GraphQLProjectConfig);
   const cid = await graphqlService.fetchCidFromEndpoint(endpoint);
 

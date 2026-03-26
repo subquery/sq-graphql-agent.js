@@ -1,5 +1,5 @@
-// Copyright 2020-2025 SubQuery Pte Ltd authors & contributors
-// SPDX-License-Identifier: GPL-3.0
+// Copyright 2020-2026 SubQuery Pte Ltd authors & contributors
+// SPDX-License-Identifier: PolyForm-Shield-1.0.0
 
 const IPFS_GATEWAY_POOL: Array<{url: string; method: string}> = [
   {
@@ -18,6 +18,35 @@ async function fetchWithTimeout(url: string, init: RequestInit): Promise<Respons
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Check if the endpoint is a Codex GraphQL API endpoint.
+ * Strictly matches https://graph.codex.io/graphql
+ */
+export function isCodexEndpoint(endpoint: string): boolean {
+  try {
+    const url = new URL(endpoint);
+    return url.hostname.toLowerCase() === 'graph.codex.io';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get a header value from a headers object with case-insensitive lookup.
+ * HTTP headers are case-insensitive per RFC 7230.
+ */
+export function getHeader(headers: Record<string, string> | undefined, name: string): string | undefined {
+  if (!headers) return undefined;
+
+  const lowerName = name.toLowerCase();
+  for (const key of Object.keys(headers)) {
+    if (key.toLowerCase() === lowerName) {
+      return headers[key];
+    }
+  }
+  return undefined;
 }
 
 export async function fetchFromIPFS(rawPath: string): Promise<string> {

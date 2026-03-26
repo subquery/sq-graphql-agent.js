@@ -1,5 +1,5 @@
-// Copyright 2020-2025 SubQuery Pte Ltd authors & contributors
-// SPDX-License-Identifier: GPL-3.0
+// Copyright 2020-2026 SubQuery Pte Ltd authors & contributors
+// SPDX-License-Identifier: PolyForm-Shield-1.0.0
 
 import {type Logger} from 'pino';
 import yaml from 'yaml';
@@ -27,6 +27,12 @@ export class ProjectManager {
     force = false,
     logger?: Logger
   ): Promise<GraphQLProjectConfig> {
+    // Codex configs are already complete from getCodexConfig()
+    if (config.nodeType === GraphqlProvider.CODEX) {
+      logger?.debug({endpoint: config.endpoint}, 'Codex config already complete, skipping enrichment');
+      return config;
+    }
+
     if (!this.shouldAttemptAnalysis(config, force)) {
       return config;
     }
@@ -44,6 +50,7 @@ export class ProjectManager {
           domainName: analysis.domainName,
           domainCapabilities: analysis.domainCapabilities,
           declineMessage: analysis.declineMessage,
+          suggestedQuestions: analysis.suggestedQuestions,
           lastAnalyzedAt: new Date().toISOString(),
         };
         delete updated.lastAnalysisError;

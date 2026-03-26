@@ -1,5 +1,5 @@
-// Copyright 2020-2025 SubQuery Pte Ltd authors & contributors
-// SPDX-License-Identifier: GPL-3.0
+// Copyright 2020-2026 SubQuery Pte Ltd authors & contributors
+// SPDX-License-Identifier: PolyForm-Shield-1.0.0
 
 import type {IntrospectionQuery} from 'graphql';
 import type {Logger} from 'pino';
@@ -11,6 +11,7 @@ export type GraphQLAgent = {
 export enum GraphqlProvider {
   SUBQL = 'subql',
   THE_GRAPH = 'thegraph',
+  CODEX = 'codex',
   UNKNOWN = 'unknown',
 }
 
@@ -38,7 +39,7 @@ export interface GraphQLAnalysisResult {
   domainName: string;
   domainCapabilities: string[];
   declineMessage: string;
-  // suggestedQuestions: string[];
+  suggestedQuestions: string[];
 }
 
 export interface GraphQLProjectConfigInput {
@@ -57,8 +58,10 @@ export interface GraphQLProjectConfig extends GraphQLProjectConfigInput {
   domainName: string;
   domainCapabilities: string[];
   declineMessage: string;
+  suggestedQuestions?: string[];
   // Cached introspection schema from endpoint
   introspectionSchema?: IntrospectionQuery;
+  fullSchema?: string;
 }
 
 export type PersistentService = {

@@ -1,5 +1,5 @@
-// Copyright 2020-2025 SubQuery Pte Ltd authors & contributors
-// SPDX-License-Identifier: GPL-3.0
+// Copyright 2020-2026 SubQuery Pte Ltd authors & contributors
+// SPDX-License-Identifier: PolyForm-Shield-1.0.0
 
 import {DynamicStructuredTool} from '@langchain/core/tools';
 import {parse} from 'graphql';
@@ -254,18 +254,6 @@ export function createGraphQLValidatorAndExecuteTool(
           if (schemaValidationErrors.length > 0) {
             logger?.error({errors: schemaValidationErrors}, `Schema validation failed`);
             return `❌ Schema validation failed:\n${schemaValidationErrors.map((error: string) => `- ${error}`).join('\n')}`;
-          }
-
-          // If we have GraphQL service but no cached schema, try to fetch and cache it
-          if (graphQLService) {
-            try {
-              // Trigger schema fetch to populate cache for future validations
-              graphQLService.fetchSchema().catch((error: any) => {
-                logger?.warn({error: error.message}, `Failed to fetch schema for caching`);
-              });
-            } catch (fetchError: any) {
-              logger?.debug({error: fetchError.message}, `Schema fetch attempt completed`);
-            }
           }
 
           return await _execute(query, variables);
