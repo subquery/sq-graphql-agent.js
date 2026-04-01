@@ -4,18 +4,19 @@
 import {DynamicStructuredTool} from '@langchain/core/tools';
 import type {Logger} from 'pino';
 import {z} from 'zod';
+import type {CovalentContext} from '../context.js';
 import {CovalentService} from '../service.js';
 import type {CovalentConfig} from '../types.js';
-import {ResultFileManager} from './file-manager.js';
 
 /**
  * Create the Covalent Query tool
- *
- * Executes REST API requests against Covalent endpoints and saves results to temp files.
  */
-export function createCovalentQueryTool(config: CovalentConfig, logger?: Logger): DynamicStructuredTool {
+export function createCovalentQueryTool(
+  config: CovalentConfig,
+  context: CovalentContext,
+  logger?: Logger
+): DynamicStructuredTool {
   const service = new CovalentService(config, logger);
-  const fileManager = ResultFileManager.getInstance(logger);
 
   const schema = z.object({
     path: z.string().describe('REST API path, starting with /v1/'),
@@ -50,7 +51,7 @@ export function createCovalentQueryTool(config: CovalentConfig, logger?: Logger)
     🛑 CRITICAL RULES:
     1. Call covalent_api_info FIRST to understand endpoints
     2. Chain names are CASE-SENSITIVE: "eth-mainnet" not "Ethereum"
-    3. After getting results, use covalent_result_head or covalent_result_jq to explore
+    3. After getting results, use covalent_result_jq to extract fields
     4. Balance values need division by 10^contract_decimals
 
     Example:
@@ -65,7 +66,6 @@ export function createCovalentQueryTool(config: CovalentConfig, logger?: Logger)
 
       // Validate path format
       if (!path.startsWith('/v1/')) {
-        logger?.warn({path}, 'Invalid path format');
         return '❌ Error: Path must start with /v1/';
       }
 
@@ -74,11 +74,7 @@ export function createCovalentQueryTool(config: CovalentConfig, logger?: Logger)
 
       const executionTime = Date.now() - startTime;
       logger?.info(
-        {
-          executionTime,
-          hasData: result.data !== null,
-          hasError: result.error,
-        },
+        {executionTime, hasData: result.data !== null, hasError: result.error},
         'Covalent request completed'
       );
 
@@ -88,32 +84,25 @@ export function createCovalentQueryTool(config: CovalentConfig, logger?: Logger)
         return `❌ API Error: ${result.error_message || 'Unknown error'} (code: ${result.error_code || 'N/A'})`;
       }
 
-      // Save result to temp file
+      // Cache result in context
       if (result.data !== null && result.data !== undefined) {
-        const saved = fileManager.saveResult(result.data, path);
+        const saved = context.setResult(result.data, path);
         const items = result.data as {items?: unknown[]};
         const itemCount = Array.isArray(items?.items) ? items.items.length : 'unknown';
 
         logger?.info(
-          {
-            fileId: saved.id,
-            fileSizeKB: Math.round(saved.size / 1024),
-            itemCount,
-            executionTime,
-          },
-          'Result saved to file'
+          {resultId: saved.id, sizeKB: Math.round(saved.size / 1024), itemCount, executionTime},
+          'Result cached'
         );
 
-        return `✅ Request successful. Result saved to file.
+        return `✅ Request successful.
 
-📁 File ID: ${saved.id}
 📊 Items: ${itemCount}
 📦 Size: ${Math.round(saved.size / 1024)}KB
 ⏱️ Time: ${executionTime}ms
 
-Use these tools to explore the result:
-- covalent_result_head: View first N items
-- covalent_result_jq: Extract specific fields with JSONPath`;
+Use covalent_result_jq to extract specific fields.
+Use covalent_result_head to inspect structure if needed.`;
       }
 
       logger?.warn({result}, 'Unexpected response format');
@@ -124,12 +113,8 @@ Use these tools to explore the result:
 
 /**
  * Create the Result Head tool
- *
- * Shows the first N items from a saved result.
  */
-export function createCovalentResultHeadTool(logger?: Logger): DynamicStructuredTool {
-  const fileManager = ResultFileManager.getInstance(logger);
-
+export function createCovalentResultHeadTool(context: CovalentContext, logger?: Logger): DynamicStructuredTool {
   const schema = z.object({
     count: z.number().min(1).max(50).default(5).describe('Number of items to show'),
   });
@@ -138,19 +123,18 @@ export function createCovalentResultHeadTool(logger?: Logger): DynamicStructured
     name: 'covalent_result_head',
     description: `View the first N items from the most recent saved result.
 
-    🎯 Use this AFTER covalent_query to explore the data.
-    🎯 Call this INSTEAD of making another API call with different page-size.
+    🔄 FALLBACK: Use this ONLY if covalent_result_jq fails or you need to explore the structure.
+    💡 PREFER: Use covalent_result_jq directly when you know the schema from covalent_api_info.
 
     Input:
-    - count: Number of items to show (default: 5, max: 50)
-
-    After viewing, use covalent_result_jq to extract specific fields.`,
+    - count: Number of items to show (default: 5, max: 50)`,
     schema,
-    func: (input: z.infer<typeof schema>) => {
+    // eslint-disable-next-line @typescript-eslint/require-await
+    func: async (input: z.infer<typeof schema>) => {
       const {count} = input;
       logger?.info({tool: 'covalent_result_head', input: {count}}, 'Tool invoked');
 
-      const result = fileManager.getLatestResult();
+      const result = context.getResult();
 
       if (!result) {
         logger?.warn({tool: 'covalent_result_head'}, 'No saved result found');
@@ -180,23 +164,19 @@ export function createCovalentResultHeadTool(logger?: Logger): DynamicStructured
         'Tool completed'
       );
 
-      return `📋 First ${headItems.length} of ${items.items.length} items (File: ${result.id}):
+      return `📋 First ${headItems.length} of ${items.items.length} items:
 
 ${formatted}
 
-💡 Next: Use covalent_result_jq to extract specific fields from all ${items.items.length} items.`;
+💡 Next: Use covalent_result_jq to extract specific fields.`;
     },
   });
 }
 
 /**
  * Create the Result JQ tool
- *
- * Extracts specific fields from a saved result using simple JSONPath.
  */
-export function createCovalentResultJqTool(logger?: Logger): DynamicStructuredTool {
-  const fileManager = ResultFileManager.getInstance(logger);
-
+export function createCovalentResultJqTool(context: CovalentContext, logger?: Logger): DynamicStructuredTool {
   const schema = z.object({
     path: z
       .string()
@@ -207,23 +187,25 @@ export function createCovalentResultJqTool(logger?: Logger): DynamicStructuredTo
     name: 'covalent_result_jq',
     description: `Extract specific fields from the saved result using JSONPath.
 
-    🎯 Use this AFTER covalent_query and covalent_result_head to get specific data.
+    ⭐ PRIMARY TOOL: Use this FIRST after covalent_query (you know the schema from covalent_api_info).
+    🔄 FALLBACK: If jq fails, use covalent_result_head to inspect structure first.
 
     JSONPath examples:
     - "items[0]" - First item
     - "items[0:5]" - First 5 items
-    - "items[*].contract_name" - All contract names
     - "items[*].contract_ticker_symbol" - All ticker symbols
     - "items[*].pretty_quote" - All formatted USD values
+    - "items[*].contract_name" - All contract names
 
     Input:
     - path: JSONPath expression`,
     schema,
-    func: (input: z.infer<typeof schema>) => {
+    // eslint-disable-next-line @typescript-eslint/require-await
+    func: async (input: z.infer<typeof schema>) => {
       const {path} = input;
       logger?.info({tool: 'covalent_result_jq', input: {path}}, 'Tool invoked');
 
-      const result = fileManager.getLatestResult();
+      const result = context.getResult();
 
       if (!result) {
         logger?.warn('No saved result found');
@@ -261,52 +243,145 @@ ${formatted}`;
  * Simple JSONPath extraction
  */
 function extractByPath(data: unknown, path: string): unknown {
-  // Handle items[*].field pattern
-  const wildcardMatch = path.match(/^items\[\*\]\.(\S+)$/);
-  if (wildcardMatch && wildcardMatch[1]) {
-    const field = wildcardMatch[1];
-    const obj = data as {items?: Record<string, unknown>[]};
-    if (Array.isArray(obj?.items)) {
-      return obj.items.map((item) => item[field]);
+  const obj = data as {items?: unknown[]};
+
+  // Helper to parse object construction pattern: {alias: field, alias2: field2}
+  function parseObjectPattern(pattern: string): Record<string, string> | null {
+    if (!pattern.startsWith('{') || !pattern.endsWith('}')) {
+      return null;
+    }
+    const content = pattern.slice(1, -1);
+    const fields: Record<string, string> = {};
+    const pairs = content.split(',').map((p) => p.trim());
+    for (const pair of pairs) {
+      const colonIndex = pair.indexOf(':');
+      if (colonIndex > 0) {
+        const alias = pair.slice(0, colonIndex).trim();
+        const field = pair.slice(colonIndex + 1).trim();
+        if (alias && field) {
+          fields[alias] = field;
+        }
+      }
+    }
+    return Object.keys(fields).length > 0 ? fields : null;
+  }
+
+  // Helper to extract object with multiple fields from an item
+  function extractObjectFromItem(
+    item: Record<string, unknown>,
+    fieldMap: Record<string, string>
+  ): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const [alias, field] of Object.entries(fieldMap)) {
+      result[alias] = item[field];
+    }
+    return result;
+  }
+
+  // Handle items[*].{alias: field, ...} pattern (all items, multiple fields)
+  const wildcardObjMatch = path.match(/^items\[\*\]\.(\{.+\})$/);
+  if (wildcardObjMatch && wildcardObjMatch[1]) {
+    const fieldMap = parseObjectPattern(wildcardObjMatch[1]);
+    if (fieldMap && Array.isArray(obj?.items)) {
+      const items = obj.items as Record<string, unknown>[];
+      return items.map((item) => extractObjectFromItem(item, fieldMap));
     }
   }
 
-  // Handle items[0:5] pattern (slice)
+  // Handle items[0:N].{alias: field, ...} pattern (slice, multiple fields)
+  const sliceObjMatch = path.match(/^items\[(\d+):(\d+)\]\.(\{.+\})$/);
+  if (sliceObjMatch && sliceObjMatch[1] && sliceObjMatch[2] && sliceObjMatch[3]) {
+    const start = parseInt(sliceObjMatch[1], 10);
+    const end = parseInt(sliceObjMatch[2], 10);
+    const fieldMap = parseObjectPattern(sliceObjMatch[3]);
+    if (fieldMap && Array.isArray(obj?.items)) {
+      const items = obj.items as Record<string, unknown>[];
+      return items.slice(start, end).map((item) => extractObjectFromItem(item, fieldMap));
+    }
+  }
+
+  // Handle items[N].{alias: field, ...} pattern (single index, multiple fields)
+  const indexObjMatch = path.match(/^items\[(\d+)\]\.(\{.+\})$/);
+  if (indexObjMatch && indexObjMatch[1] && indexObjMatch[2]) {
+    const index = parseInt(indexObjMatch[1], 10);
+    const fieldMap = parseObjectPattern(indexObjMatch[2]);
+    if (fieldMap && Array.isArray(obj?.items)) {
+      const items = obj.items as Record<string, unknown>[];
+      const item = items[index];
+      if (item && typeof item === 'object') {
+        return extractObjectFromItem(item, fieldMap);
+      }
+    }
+  }
+
+  // Handle items[*].field pattern (all items, single field)
+  const wildcardMatch = path.match(/^items\[\*\]\.(\S+)$/);
+  if (wildcardMatch && wildcardMatch[1]) {
+    const field = wildcardMatch[1];
+    if (Array.isArray(obj?.items)) {
+      const items = obj.items as Record<string, unknown>[];
+      return items.map((item) => item[field]);
+    }
+  }
+
+  // Handle items[0:N].field pattern (slice + field)
+  const sliceFieldMatch = path.match(/^items\[(\d+):(\d+)\]\.(\S+)$/);
+  if (sliceFieldMatch && sliceFieldMatch[1] && sliceFieldMatch[2] && sliceFieldMatch[3]) {
+    const start = parseInt(sliceFieldMatch[1], 10);
+    const end = parseInt(sliceFieldMatch[2], 10);
+    const field = sliceFieldMatch[3];
+    if (Array.isArray(obj?.items)) {
+      const items = obj.items as Record<string, unknown>[];
+      return items.slice(start, end).map((item) => item[field]);
+    }
+  }
+
+  // Handle items[0:N] pattern (slice only)
   const sliceMatch = path.match(/^items\[(\d+):(\d+)\]$/);
   if (sliceMatch && sliceMatch[1] && sliceMatch[2]) {
     const start = parseInt(sliceMatch[1], 10);
     const end = parseInt(sliceMatch[2], 10);
-    const obj = data as {items?: unknown[]};
     if (Array.isArray(obj?.items)) {
       return obj.items.slice(start, end);
     }
   }
 
-  // Handle items[N] pattern (single index)
-  const indexMatch = path.match(/^items\[(\d+)\]\.?(.*)$/);
-  if (indexMatch && indexMatch[1]) {
-    const index = parseInt(indexMatch[1], 10);
-    const rest = indexMatch[2] || '';
-    const obj = data as {items?: Record<string, unknown>[]};
-    if (Array.isArray(obj?.items) && obj.items[index]) {
-      const item = obj.items[index];
-      if (rest) {
-        // Handle nested field like items[0].contract_name
-        return rest.split('.').reduce((acc: unknown, key: string) => {
-          if (acc && typeof acc === 'object') {
-            return (acc as Record<string, unknown>)[key];
-          }
-          return undefined;
-        }, item);
+  // Handle items[N].field pattern (single index + field)
+  const indexFieldMatch = path.match(/^items\[(\d+)\]\.(\S+)$/);
+  if (indexFieldMatch && indexFieldMatch[1] && indexFieldMatch[2]) {
+    const index = parseInt(indexFieldMatch[1], 10);
+    const field = indexFieldMatch[2];
+    if (Array.isArray(obj?.items)) {
+      const items = obj.items as Record<string, unknown>[];
+      const item = items[index];
+      if (item && typeof item === 'object') {
+        return item[field];
       }
-      return item;
     }
   }
 
-  // Handle simple field access
-  if (path && !path.includes('[') && !path.includes('.')) {
-    const obj = data as Record<string, unknown>;
-    return obj?.[path];
+  // Handle items[N] pattern (single index)
+  const indexMatch = path.match(/^items\[(\d+)\]$/);
+  if (indexMatch && indexMatch[1]) {
+    const index = parseInt(indexMatch[1], 10);
+    if (Array.isArray(obj?.items)) {
+      return obj.items[index];
+    }
+  }
+
+  // Handle simple field access (top-level)
+  if (path && !path.includes('[')) {
+    const dataObj = data as Record<string, unknown>;
+    if (path.includes('.')) {
+      // Handle nested field like pagination.has_more
+      return path.split('.').reduce((acc: unknown, key: string) => {
+        if (acc && typeof acc === 'object') {
+          return (acc as Record<string, unknown>)[key];
+        }
+        return undefined;
+      }, dataObj);
+    }
+    return dataObj?.[path];
   }
 
   throw new Error(`Unsupported path format: ${path}`);

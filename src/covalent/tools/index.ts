@@ -3,6 +3,7 @@
 
 import type {DynamicStructuredTool} from '@langchain/core/tools';
 import type {Logger} from 'pino';
+import type {CovalentContext} from '../context.js';
 import type {CovalentConfig} from '../types.js';
 import {createCovalentApiInfoTool} from './api-info.tool.js';
 import {createCovalentQueryTool, createCovalentResultHeadTool, createCovalentResultJqTool} from './query.tool.js';
@@ -10,11 +11,15 @@ import {createCovalentQueryTool, createCovalentResultHeadTool, createCovalentRes
 /**
  * Create Covalent REST API tools for the agent
  */
-export function createCovalentTools(config: CovalentConfig, logger?: Logger): DynamicStructuredTool[] {
+export function createCovalentTools(
+  config: CovalentConfig,
+  context: CovalentContext,
+  logger?: Logger
+): DynamicStructuredTool[] {
   return [
     createCovalentApiInfoTool(logger),
-    createCovalentQueryTool(config, logger),
-    createCovalentResultHeadTool(logger),
-    createCovalentResultJqTool(logger),
+    createCovalentQueryTool(config, context, logger),
+    createCovalentResultHeadTool(context, logger),
+    createCovalentResultJqTool(context, logger),
   ];
 }

@@ -34,35 +34,36 @@ ${config.verbose >= 2 ? '- Explain your endpoint selection strategy and any para
 DOMAIN CAPABILITIES:
 ${capabilities}
 
-🔧 WORKFLOW (STRICT ORDER):
-1. Call covalent_api_info ONCE to understand endpoints
-2. Call covalent_query ONCE to fetch data (result saved to file automatically)
-3. Use covalent_result_head to view sample items
-4. Use covalent_result_jq to extract specific fields
+🔧 WORKFLOW:
+1. Call covalent_api_info ONCE to understand endpoints AND response schemas
+2. Call covalent_query ONCE to fetch data
+3. Use covalent_result_jq to extract specific fields (you know the schema from step 1!)
+4. If jq fails, use covalent_result_head to inspect structure
 5. Provide final answer based on the data
 
+💡 KEY INSIGHT: covalent_api_info shows you the EXACT response structure for each endpoint.
+   Use this to construct precise jq paths WITHOUT calling head first.
+
 🛑 NEVER call covalent_query more than ONCE for the same question!
-🛑 NEVER change page-size and call again - use covalent_result_head instead!
 🛑 NEVER repeat the same API call!
 
 EXAMPLE WORKFLOW:
 User: "What tokens does vitalik.eth own?"
-1. Call covalent_api_info (get API spec)
+1. Call covalent_api_info → learn balances_v2 returns items[] with contract_ticker_symbol, pretty_quote
 2. Call covalent_query with path "/v1/eth-mainnet/address/vitalik.eth/balances_v2/"
-3. Call covalent_result_head with count 5 (see first 5 tokens)
-4. Call covalent_result_jq with path "items[*].contract_ticker_symbol" (get all symbols)
-5. Answer the user with the data you found
+3. Call covalent_result_jq with path "items[*].contract_ticker_symbol" (you know this field exists from step 1!)
+4. Answer: "vitalik.eth owns ETH, USDC, DAI..."
 
 ⚠️ CRITICAL RULES:
 - Chain names are CASE-SENSITIVE: "eth-mainnet" not "Ethereum"
 - ENS names (e.g., vitalik.eth) are supported for eth-mainnet
 - Balance values are raw strings - divide by 10^contract_decimals for human-readable
 - Page numbers are 0-indexed (first page is 0)
-- Make ONE API call, then explore results with head/jq tools
+- Response schemas in covalent_api_info show you available fields - use them directly!
 
 ${verboseInstructions}
 
 🔍 Self-check before making ANY additional covalent_query call:
-- "Have I already called covalent_query?" → If YES, use covalent_result_head/jq instead
-- "Am I changing page-size to get 'different' results?" → DON'T, use head tool instead`;
+- "Have I already called covalent_query?" → If YES, use covalent_result_jq instead
+- "Do I know the response schema?" → If YES, construct jq path and call jq directly`;
 }

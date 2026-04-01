@@ -5,6 +5,7 @@ import {BaseMessage, HumanMessage, isAIMessage, SystemMessage} from '@langchain/
 import {createReactAgent} from '@langchain/langgraph/prebuilt';
 import {ChatOpenAI} from '@langchain/openai';
 import type {Logger} from 'pino';
+import {CovalentContext} from './context.js';
 import {buildCovalentSystemPrompt} from './prompts.js';
 import {createCovalentTools} from './tools/index.js';
 import type {CovalentAgent, CovalentAgentConfig, CovalentConfig} from './types.js';
@@ -55,6 +56,9 @@ export function createCovalentAgent(
   agentConfig: CovalentAgentConfig,
   logger?: Logger
 ): CovalentAgent {
+  // Create per-session context
+  const context = new CovalentContext();
+
   // Create LLM instance
   const llm = new ChatOpenAI({
     model: agentConfig.llm.model,
@@ -65,8 +69,8 @@ export function createCovalentAgent(
     },
   });
 
-  // Create Covalent tools
-  const tools = createCovalentTools(config, logger);
+  // Create Covalent tools with shared context
+  const tools = createCovalentTools(config, context, logger);
 
   // Create React agent
   const agent = createReactAgent({llm, tools}).withConfig({

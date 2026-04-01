@@ -171,5 +171,148 @@ GET /v1/{chainName}/gas_prices/
 Supported: USD, CAD, EUR, SGD, INR, JPY, VND, CNY, KRW, RUB, TRY, NGN, ARS, AUD, CHF, GBP
 
 ## ENS Resolution
-ENS names (e.g., vitalik.eth) are automatically resolved for eth-mainnet`;
+ENS names (e.g., vitalik.eth) are automatically resolved for eth-mainnet
+
+## Response Schemas
+
+Each endpoint returns a consistent structure. Use these schemas to construct jq paths directly.
+
+### Token Balances (balances_v2)
+Response structure:
+{
+  "address": "0x...",
+  "chain_id": 1,
+  "chain_name": "eth-mainnet",
+  "quote_currency": "USD",
+  "items": [
+    {
+      "contract_ticker_symbol": "ETH",
+      "contract_name": "Ethereum",
+      "contract_address": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "contract_decimals": 18,
+      "balance": "1234567890000000000",
+      "quote": 1234.56,
+      "pretty_quote": "$1,234.56",
+      "quote_rate": 2500.00,
+      "type": "cryptocurrency",
+      "native_token": true,
+      "is_spam": false
+    }
+  ]
+}
+
+Useful jq paths:
+- items[*].contract_ticker_symbol - All token symbols
+- items[*].contract_name - All token names
+- items[*].pretty_quote - All formatted USD values
+- items[*].balance - All raw balances
+- items[0] - First token
+
+### Transactions (transactions_v3)
+Response structure:
+{
+  "address": "0x...",
+  "items": [
+    {
+      "tx_hash": "0x...",
+      "block_signed_at": "2024-01-01T00:00:00Z",
+      "from_address": "0x...",
+      "to_address": "0x...",
+      "value": "1000000000000000000",
+      "value_quote": 2500.00,
+      "gas_spent": 21000,
+      "fees_paid": "4200000000000000",
+      "successful": true,
+      "log_events": []
+    }
+  ],
+  "pagination": {
+    "has_more": true,
+    "page_number": 0,
+    "page_size": 100,
+    "total_count": 500
+  }
+}
+
+Useful jq paths:
+- items[*].tx_hash - All transaction hashes
+- items[*].block_signed_at - All timestamps
+- items[*].from_address - All senders
+- items[*].to_address - All receivers
+- items[*].value_quote - All USD values
+
+### NFT Holdings (nft)
+Response structure:
+{
+  "address": "0x...",
+  "items": [
+    {
+      "contract_name": "Bored Ape Yacht Club",
+      "contract_ticker_symbol": "BAYC",
+      "contract_address": "0x...",
+      "supports_erc": ["ERC721"],
+      "nft_data": [
+        {
+          "token_id": "1234",
+          "token_balance": "1",
+          "token_url": "https://..."
+        }
+      ]
+    }
+  ]
+}
+
+Useful jq paths:
+- items[*].contract_name - All collection names
+- items[*].nft_data[*].token_id - All token IDs
+
+### Token Holders (token_holders_v2)
+Response structure:
+{
+  "items": [
+    {
+      "address": "0x...",
+      "balance": "1000000000000000000",
+      "contract_ticker_symbol": "USDC",
+      "total_supply": "10000000000000000000000000"
+    }
+  ],
+  "pagination": {"has_more": true, "page_number": 0, "page_size": 100, "total_count": 1000}
+}
+
+Useful jq paths:
+- items[*].address - All holder addresses
+- items[*].balance - All balances
+
+### Address Activity (activity)
+Response structure:
+{
+  "items": [
+    {
+      "chain_name": "eth-mainnet",
+      "chain_id": 1,
+      "active": true
+    }
+  ]
+}
+
+Useful jq paths:
+- items[*].chain_name - All active chains
+- items[?active==true] - Filter active chains
+
+### Token Prices (pricing/historical_by_addresses_v2)
+Response structure:
+{
+  "items": [
+    {
+      "contract_ticker_symbol": "USDC",
+      "quote_rate": 1.00,
+      "pretty_quote_rate": "$1.00"
+    }
+  ]
+}
+
+Useful jq paths:
+- items[*].contract_ticker_symbol - All symbols
+- items[*].quote_rate - All prices`;
 }
