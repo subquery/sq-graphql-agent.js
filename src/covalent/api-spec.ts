@@ -1,27 +1,14 @@
 // Copyright 2020-2026 SubQuery Pte Ltd authors & contributors
 // SPDX-License-Identifier: PolyForm-Shield-1.0.0
 
-import {readFileSync} from 'fs';
-import {dirname, join} from 'path';
-import {fileURLToPath} from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const referencesDir = join(__dirname, 'references');
-
-/**
- * Read a reference file content
- */
-function readReference(filename: string): string {
-  try {
-    return readFileSync(join(referencesDir, filename), 'utf-8');
-  } catch {
-    return `// File ${filename} not found`;
-  }
-}
+import balancesReference from './references/endpoints-balances.js';
+import nftSecurityCrosschainReference from './references/endpoints-nft-security-crosschain.js';
+import transactionsReference from './references/endpoints-transactions.js';
+import utilityReference from './references/endpoints-utility.js';
+import workflowsReference from './references/workflows.js';
 
 function getWorkflowsDoc(): string {
-  return readReference('workflows.md');
+  return workflowsReference;
 }
 
 /**
@@ -86,15 +73,15 @@ export function getChainNamesRef(): string {
  * Get category-specific documentation
  */
 export function getCategoryDoc(category: string): string {
-  const categoryMap: Record<string, {file: string; title: string}> = {
-    workflows: {file: 'workflows.md', title: 'Common Workflows'},
-    balances: {file: 'endpoints-balances.md', title: 'Balance Endpoints'},
-    transactions: {file: 'endpoints-transactions.md', title: 'Transaction Endpoints'},
+  const categoryMap: Record<string, {content: string; title: string}> = {
+    workflows: {content: workflowsReference, title: 'Common Workflows'},
+    balances: {content: balancesReference, title: 'Balance Endpoints'},
+    transactions: {content: transactionsReference, title: 'Transaction Endpoints'},
     'nft-security-crosschain': {
-      file: 'endpoints-nft-security-crosschain.md',
+      content: nftSecurityCrosschainReference,
       title: 'NFT, Security & Cross-Chain Endpoints',
     },
-    utility: {file: 'endpoints-utility.md', title: 'Utility Endpoints'},
+    utility: {content: utilityReference, title: 'Utility Endpoints'},
   };
 
   const mapping = categoryMap[category.toLowerCase()];
@@ -103,9 +90,9 @@ export function getCategoryDoc(category: string): string {
   }
 
   const workflows = getWorkflowsDoc();
-  const content = readReference(mapping.file);
+  const content = mapping.content;
 
-  if (mapping.file === 'workflows.md') {
+  if (category.toLowerCase() === 'workflows') {
     return `# ${mapping.title}
 
 ${content}`;
