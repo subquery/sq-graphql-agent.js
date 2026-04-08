@@ -82,10 +82,31 @@ export function createCovalentAgent(
       const systemPrompt = buildCovalentSystemPrompt(agentConfig);
       const messages = [new SystemMessage(systemPrompt), new HumanMessage(question)];
 
-      const result = await agent.invoke({messages});
-      const text = extractTextFromResult(result);
+      try {
+        logger?.debug({question: question.slice(0, 100)}, 'Starting agent invocation');
+        const result = await agent.invoke({messages});
+        logger?.debug({hasMessages: !!result?.messages}, 'Agent invocation completed');
+        const text = extractTextFromResult(result);
+        return text || 'Agent completed without producing a final response.';
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        const errorDetails =
+          error instanceof Error && 'response' in error
+            ? JSON.stringify((error as Record<string, unknown>).response, null, 2)
+            : undefined;
 
-      return text || 'Agent completed without producing a final response.';
+        logger?.error(
+          {
+            error: errorMessage,
+            stack: errorStack,
+            details: errorDetails,
+          },
+          'Agent invocation failed'
+        );
+
+        throw error;
+      }
     },
   };
 }

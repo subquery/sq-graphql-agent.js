@@ -1,12 +1,37 @@
 // Copyright 2020-2026 SubQuery Pte Ltd authors & contributors
 // SPDX-License-Identifier: PolyForm-Shield-1.0.0
 
+import {existsSync} from 'fs';
+import {createRequire} from 'module';
+import {dirname, join} from 'path';
 import {DynamicStructuredTool} from '@langchain/core/tools';
 import type {Logger} from 'pino';
 import {z} from 'zod';
 import type {CovalentContext} from '../context.js';
 import {CovalentService} from '../service.js';
 import type {CovalentConfig} from '../types.js';
+
+const require = createRequire(import.meta.url);
+const JQ_BUILTINS = new Set([
+  'add',
+  'all',
+  'any',
+  'del',
+  'group_by',
+  'keys',
+  'length',
+  'map',
+  'max',
+  'min',
+  'reverse',
+  'select',
+  'sort',
+  'sort_by',
+  'tostring',
+  'tonumber',
+  'unique',
+  'values',
+]);
 
 /**
  * Create the Covalent Query tool
@@ -39,7 +64,7 @@ export function createCovalentQueryTool(
     Example paths:
     - Token balances: /v1/eth-mainnet/address/vitalik.eth/balances_v2/
     - Transactions: /v1/eth-mainnet/address/0x.../transactions_v3/
-    - NFTs: /v1/eth-mainnet/address/0x.../nft/
+    - Token prices: /v1/pricing/historical_by_addresses_v2/eth-mainnet/USD/0x.../
     - Token holders: /v1/eth-mainnet/tokens/0x.../token_holders_v2/
 
     Common params:
@@ -51,12 +76,14 @@ export function createCovalentQueryTool(
     🛑 CRITICAL RULES:
     1. Call covalent_api_info FIRST to understand endpoints
     2. Chain names are CASE-SENSITIVE: "eth-mainnet" not "Ethereum"
-    3. After getting results, use covalent_result_jq to extract fields
-    4. Balance values need division by 10^contract_decimals
+    3. Raw Covalent responses use top-level fields named data, error, error_message, and error_code
+    4. This tool caches only response.data for downstream inspection
+    5. After getting results, use covalent_result_jq to extract fields
+    6. Balance values need division by 10^contract_decimals
 
     Example:
     - path: "/v1/eth-mainnet/address/vitalik.eth/balances_v2/"
-    - params: { "quote-currency": "USD", "no-spam": "true" }`,
+    - params: quote-currency=USD, no-spam=true`,
     schema,
     func: async (input: z.infer<typeof schema>) => {
       const {params, path} = input;
@@ -87,22 +114,51 @@ export function createCovalentQueryTool(
       // Cache result in context
       if (result.data !== null && result.data !== undefined) {
         const saved = context.setResult(result.data, path);
-        const items = result.data as {items?: unknown[]};
-        const itemCount = Array.isArray(items?.items) ? items.items.length : 'unknown';
+
+        // Detect response structure
+        let itemCount: number | string = 'unknown';
+        let structureHint = '';
+
+        if (Array.isArray(result.data)) {
+          itemCount = result.data.length;
+          structureHint = 'array';
+        } else if (result.data && typeof result.data === 'object') {
+          const dataObj = result.data as Record<string, unknown>;
+          if (Array.isArray(dataObj.items)) {
+            itemCount = dataObj.items.length;
+            structureHint = 'object with items';
+          } else {
+            // Check for common nested arrays
+            const keys = Object.keys(dataObj);
+            const arrayKeys = keys.filter((k) => Array.isArray(dataObj[k]));
+            if (arrayKeys.length === 1) {
+              const [arrayKey] = arrayKeys;
+              if (arrayKey) {
+                itemCount = (dataObj[arrayKey] as unknown[]).length;
+                structureHint = `object with ${arrayKey} array`;
+              }
+            } else {
+              itemCount = 1;
+              structureHint = 'object';
+            }
+          }
+        }
 
         logger?.info(
-          {resultId: saved.id, sizeKB: Math.round(saved.size / 1024), itemCount, executionTime},
+          {resultId: saved.id, sizeKB: Math.round(saved.size / 1024), itemCount, structureHint, executionTime},
           'Result cached'
         );
 
         return `✅ Request successful.
 
-📊 Items: ${itemCount}
+📊 Structure: ${structureHint} (${itemCount} items)
 📦 Size: ${Math.round(saved.size / 1024)}KB
 ⏱️ Time: ${executionTime}ms
 
-Use covalent_result_jq to extract specific fields.
-Use covalent_result_head to inspect structure if needed.`;
+⚠️ IMPORTANT: Raw Covalent responses use top-level fields named data, error, error_message, and error_code.
+👉 This tool caches only the unwrapped payload from data.
+👉 Use covalent_result_jq directly when the docs already tell you the shape.
+👉 Use covalent_result_head only if jq fails or the payload shape is unclear.`;
       }
 
       logger?.warn({result}, 'Unexpected response format');
@@ -116,21 +172,25 @@ Use covalent_result_head to inspect structure if needed.`;
  */
 export function createCovalentResultHeadTool(context: CovalentContext, logger?: Logger): DynamicStructuredTool {
   const schema = z.object({
-    count: z.number().min(1).max(50).default(5).describe('Number of items to show'),
+    count: z.number().min(1).max(200).default(20).describe('Number of text lines to show from the saved payload'),
   });
 
   return new DynamicStructuredTool({
     name: 'covalent_result_head',
-    description: `View the first N items from the most recent saved result.
+    description: `Fallback tool: preview the saved payload as text.
 
-    🔄 FALLBACK: Use this ONLY if covalent_result_jq fails or you need to explore the structure.
-    💡 PREFER: Use covalent_result_jq directly when you know the schema from covalent_api_info.
+    This behaves like a text-based "head" command.
+    It does not assume arrays, objects, or an items field.
+    Use it only when covalent_result_jq fails or when the payload shape is still unclear after reading the docs.
 
     Input:
-    - count: Number of items to show (default: 5, max: 50)`,
+    - count: Number of lines to show (default: 20, max: 200)
+
+    Output shows:
+    - The first N lines of the saved payload text
+    - A truncated preview that helps you choose the jq path`,
     schema,
-    // eslint-disable-next-line @typescript-eslint/require-await
-    func: async (input: z.infer<typeof schema>) => {
+    func: (input: z.infer<typeof schema>) => {
       const {count} = input;
       logger?.info({tool: 'covalent_result_head', input: {count}}, 'Tool invoked');
 
@@ -141,14 +201,15 @@ export function createCovalentResultHeadTool(context: CovalentContext, logger?: 
         return '❌ No saved result found. Run covalent_query first.';
       }
 
-      const items = result.data as {items?: unknown[]};
-      if (!Array.isArray(items?.items)) {
-        logger?.warn({tool: 'covalent_result_head'}, 'Result does not contain items array');
-        return '❌ Result does not contain an items array.';
-      }
-
-      const headItems = items.items.slice(0, count);
-      const formatted = JSON.stringify(headItems, null, 2);
+      const formatted = typeof result.data === 'string' ? result.data : JSON.stringify(result.data, null, 2);
+      const lines = formatted.split('\n');
+      const headLines = lines.slice(0, count);
+      const preview = headLines.join('\n');
+      const truncated = lines.length > count;
+      const largePayloadHint =
+        lines.length > 5000
+          ? '⚠️ Large payload detected. Plan ONE jq call if possible. Avoid repeated full-array scans, especially sort_by/group_by/aggregate passes.\n'
+          : '';
 
       logger?.info(
         {
@@ -157,18 +218,21 @@ export function createCovalentResultHeadTool(context: CovalentContext, logger?: 
           output: {
             resultId: result.id,
             requestedCount: count,
-            returnedCount: headItems.length,
-            totalItems: items.items.length,
+            returnedCount: headLines.length,
+            totalLines: lines.length,
+            truncated,
           },
         },
         'Tool completed'
       );
 
-      return `📋 First ${headItems.length} of ${items.items.length} items:
+      return `📋 First ${headLines.length} of ${lines.length} lines from the saved payload:
 
-${formatted}
+${preview}
 
-💡 Next: Use covalent_result_jq to extract specific fields.`;
+${truncated ? '\n... (truncated)\n' : ''}
+${largePayloadHint}
+💡 Next: Use covalent_result_jq with a path against the saved payload.`;
     },
   });
 }
@@ -180,30 +244,45 @@ export function createCovalentResultJqTool(context: CovalentContext, logger?: Lo
   const schema = z.object({
     path: z
       .string()
-      .describe('JSONPath to extract (e.g., "items[0].contract_name" or "items[*].contract_ticker_symbol")'),
+      .describe(
+        'jq filter to run against the saved payload (e.g., .items | length, .items[0:20] | map(.contract_ticker_symbol), . for all, or .data.items[0] which will be normalized)'
+      ),
   });
 
   return new DynamicStructuredTool({
     name: 'covalent_result_jq',
-    description: `Extract specific fields from the saved result using JSONPath.
+    description: `Extract specific fields from the saved result using jq.
 
-    ⭐ PRIMARY TOOL: Use this FIRST after covalent_query (you know the schema from covalent_api_info).
-    🔄 FALLBACK: If jq fails, use covalent_result_head to inspect structure first.
+    Preferred extraction tool after covalent_query.
+    Different endpoints return different payload structures (array, object with items, etc.).
+    The raw API response uses top-level fields named data, error, error_message, and error_code,
+    but this tool operates on the saved payload after unwrapping.
+    Performance note: large payloads can make jq queries expensive.
+    Prefer one final jq call instead of several exploratory passes.
+    Use covalent_result_head only if this jq call fails or the payload shape is unclear.
+    Keep jq outputs bounded. Avoid extracting hundreds or thousands of values into the model context.
 
-    JSONPath examples:
-    - "items[0]" - First item
-    - "items[0:5]" - First 5 items
-    - "items[*].contract_ticker_symbol" - All ticker symbols
-    - "items[*].pretty_quote" - All formatted USD values
-    - "items[*].contract_name" - All contract names
+    jq examples:
+    - "." - Return all data
+    - ".data" - Also returns all data (normalized to ".")
+    - ".data.items[0]" - Allowed; normalized to ".items[0]"
+    - ".items[0]" - First item
+    - ".items[0:5]" - First 5 items
+    - ".items | length" - Count items
+    - ".items | map(.quote // 0) | add" - Sum quote values safely when some are null
+    - ".items[0:20] | map(.contract_ticker_symbol)" - Fast slice to list token symbols
+    - ".items | sort_by(-(.quote // 0)) | .[0:10] | map(.contract_ticker_symbol)" - More expensive top tokens by quote
+    - ".[0].prices | map(.price)" - Map nested arrays when the root payload is an array
+    - Avoid unbounded filters like ".items | map(.contract_ticker_symbol) | unique" on very large payloads
 
     Input:
-    - path: JSONPath expression`,
+    - path: jq filter based on the saved payload structure`,
     schema,
-    // eslint-disable-next-line @typescript-eslint/require-await
     func: async (input: z.infer<typeof schema>) => {
       const {path} = input;
-      logger?.info({tool: 'covalent_result_jq', input: {path}}, 'Tool invoked');
+      const normalizedPath = normalizeDataPath(path);
+      const startTime = Date.now();
+      logger?.info({tool: 'covalent_result_jq', input: {path, normalizedPath}}, 'Tool invoked');
 
       const result = context.getResult();
 
@@ -213,176 +292,184 @@ export function createCovalentResultJqTool(context: CovalentContext, logger?: Lo
       }
 
       try {
-        const extracted = extractByPath(result.data, path);
-        const formatted = JSON.stringify(extracted, null, 2);
+        const jqResult = await runJqRawCli(result.data as object | string, normalizedPath);
+        const formatted = jqResult.stdout.trimEnd();
+
+        if (jqResult.stderr || (typeof jqResult.exitCode === 'number' && jqResult.exitCode !== 0)) {
+          const errorMessage = (jqResult.stderr || `jq exited with code ${jqResult.exitCode}`).trim();
+          const hint = getJqErrorHint(normalizedPath, errorMessage);
+
+          logger?.error(
+            {
+              path,
+              normalizedPath,
+              error: {
+                message: errorMessage,
+                exitCode: jqResult.exitCode,
+                stderr: jqResult.stderr,
+              },
+            },
+            'covalent_result_jq failed'
+          );
+
+          return `❌ Failed to extract: ${errorMessage}${hint ? `\n\n💡 Hint: ${hint}` : ''}`;
+        }
+
+        if (!formatted) {
+          return `❌ jq filter produced no output: ${normalizedPath}
+
+Call covalent_result_head again and adjust the filter to match the saved payload.`;
+        }
+
+        const resultSize = Buffer.byteLength(formatted, 'utf-8');
+        const executionTime = Date.now() - startTime;
+        let extractedType = 'string';
+
+        try {
+          const parsed = JSON.parse(formatted);
+          extractedType = Array.isArray(parsed) ? `array[${parsed.length}]` : typeof parsed;
+        } catch {
+          extractedType = 'string';
+        }
 
         logger?.info(
           {
             tool: 'covalent_result_jq',
-            input: {path},
+            input: {path, normalizedPath},
             output: {
               resultId: result.id,
-              extractedType: Array.isArray(extracted) ? `array[${extracted.length}]` : typeof extracted,
+              extractedType,
+              executionTime,
+              resultSizeKB: Math.round(resultSize / 1024),
             },
           },
           'Tool completed'
         );
 
+        // Warn if result is very large (could cause LLM issues)
+        if (resultSize > 100 * 1024) {
+          logger?.warn(
+            {resultSizeKB: Math.round(resultSize / 1024)},
+            'JQ result is large, may cause LLM context issues'
+          );
+        }
+
         return `📊 Extracted from ${result.id}:
 
-${formatted}`;
+${formatted}
+
+${executionTime > 3000 ? `⚠️ Slow jq query: ${executionTime}ms. Avoid repeated jq calls and prefer one final extraction pass.` : ''}`;
       } catch (error) {
-        logger?.error({path, error}, 'covalent_result_jq failed');
-        return `❌ Failed to extract: ${error instanceof Error ? error.message : String(error)}`;
+        const errorMessage = error instanceof Error ? error.message.trim() : String(error);
+        const hint = getJqErrorHint(normalizedPath, errorMessage);
+
+        logger?.error(
+          {
+            path,
+            normalizedPath,
+            error: {
+              message: errorMessage,
+              stack: error instanceof Error ? error.stack : undefined,
+            },
+          },
+          'covalent_result_jq failed'
+        );
+
+        return `❌ Failed to extract: ${errorMessage}${hint ? `\n\n💡 Hint: ${hint}` : ''}`;
       }
     },
   });
 }
 
-/**
- * Simple JSONPath extraction
- */
-function extractByPath(data: unknown, path: string): unknown {
-  const obj = data as {items?: unknown[]};
+function normalizeDataPath(path: string): string {
+  let normalized = path.trim();
 
-  // Helper to parse object construction pattern: {alias: field, alias2: field2}
-  function parseObjectPattern(pattern: string): Record<string, string> | null {
-    if (!pattern.startsWith('{') || !pattern.endsWith('}')) {
-      return null;
-    }
-    const content = pattern.slice(1, -1);
-    const fields: Record<string, string> = {};
-    const pairs = content.split(',').map((p) => p.trim());
-    for (const pair of pairs) {
-      const colonIndex = pair.indexOf(':');
-      if (colonIndex > 0) {
-        const alias = pair.slice(0, colonIndex).trim();
-        const field = pair.slice(colonIndex + 1).trim();
-        if (alias && field) {
-          fields[alias] = field;
-        }
-      }
-    }
-    return Object.keys(fields).length > 0 ? fields : null;
+  if (normalized === 'data' || normalized === '.data') {
+    return '.';
   }
 
-  // Helper to extract object with multiple fields from an item
-  function extractObjectFromItem(
-    item: Record<string, unknown>,
-    fieldMap: Record<string, string>
-  ): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const [alias, field] of Object.entries(fieldMap)) {
-      result[alias] = item[field];
-    }
-    return result;
+  normalized = normalized.replace(/^\.?data(?=\.|\[|$)/, '');
+  if (!normalized) {
+    return '.';
   }
 
-  // Handle items[*].{alias: field, ...} pattern (all items, multiple fields)
-  const wildcardObjMatch = path.match(/^items\[\*\]\.(\{.+\})$/);
-  if (wildcardObjMatch && wildcardObjMatch[1]) {
-    const fieldMap = parseObjectPattern(wildcardObjMatch[1]);
-    if (fieldMap && Array.isArray(obj?.items)) {
-      const items = obj.items as Record<string, unknown>[];
-      return items.map((item) => extractObjectFromItem(item, fieldMap));
-    }
+  if (normalized.startsWith('.')) {
+    return normalized;
   }
 
-  // Handle items[0:N].{alias: field, ...} pattern (slice, multiple fields)
-  const sliceObjMatch = path.match(/^items\[(\d+):(\d+)\]\.(\{.+\})$/);
-  if (sliceObjMatch && sliceObjMatch[1] && sliceObjMatch[2] && sliceObjMatch[3]) {
-    const start = parseInt(sliceObjMatch[1], 10);
-    const end = parseInt(sliceObjMatch[2], 10);
-    const fieldMap = parseObjectPattern(sliceObjMatch[3]);
-    if (fieldMap && Array.isArray(obj?.items)) {
-      const items = obj.items as Record<string, unknown>[];
-      return items.slice(start, end).map((item) => extractObjectFromItem(item, fieldMap));
-    }
+  if (normalized.startsWith('[')) {
+    return `.${normalized}`;
   }
 
-  // Handle items[N].{alias: field, ...} pattern (single index, multiple fields)
-  const indexObjMatch = path.match(/^items\[(\d+)\]\.(\{.+\})$/);
-  if (indexObjMatch && indexObjMatch[1] && indexObjMatch[2]) {
-    const index = parseInt(indexObjMatch[1], 10);
-    const fieldMap = parseObjectPattern(indexObjMatch[2]);
-    if (fieldMap && Array.isArray(obj?.items)) {
-      const items = obj.items as Record<string, unknown>[];
-      const item = items[index];
-      if (item && typeof item === 'object') {
-        return extractObjectFromItem(item, fieldMap);
-      }
-    }
+  const rootTokenMatch = normalized.match(/^([A-Za-z_][A-Za-z0-9_]*)/);
+  if (!rootTokenMatch) {
+    return normalized;
   }
 
-  // Handle items[*].field pattern (all items, single field)
-  const wildcardMatch = path.match(/^items\[\*\]\.(\S+)$/);
-  if (wildcardMatch && wildcardMatch[1]) {
-    const field = wildcardMatch[1];
-    if (Array.isArray(obj?.items)) {
-      const items = obj.items as Record<string, unknown>[];
-      return items.map((item) => item[field]);
-    }
+  const [rootToken] = rootTokenMatch;
+  return JQ_BUILTINS.has(rootToken) ? normalized : `.${normalized}`;
+}
+
+type JqRunResult = {
+  exitCode?: number;
+  stderr: string;
+  stdout: string;
+};
+
+function ensureNodeJqPath(): void {
+  if (process.env.JQ_PATH) {
+    return;
   }
 
-  // Handle items[0:N].field pattern (slice + field)
-  const sliceFieldMatch = path.match(/^items\[(\d+):(\d+)\]\.(\S+)$/);
-  if (sliceFieldMatch && sliceFieldMatch[1] && sliceFieldMatch[2] && sliceFieldMatch[3]) {
-    const start = parseInt(sliceFieldMatch[1], 10);
-    const end = parseInt(sliceFieldMatch[2], 10);
-    const field = sliceFieldMatch[3];
-    if (Array.isArray(obj?.items)) {
-      const items = obj.items as Record<string, unknown>[];
-      return items.slice(start, end).map((item) => item[field]);
-    }
+  const nodeJqPackagePath = require.resolve('node-jq/package.json');
+  const bundledJqPath = join(dirname(nodeJqPackagePath), 'bin', 'jq');
+
+  if (!existsSync(bundledJqPath)) {
+    process.env.JQ_PATH = 'jq';
+  }
+}
+
+async function runJqRawCli(input: object | string, filter: string): Promise<JqRunResult> {
+  try {
+    ensureNodeJqPath();
+    const jqModule = await import('node-jq');
+    const stdout = await jqModule.run(filter, input, {
+      input: 'json',
+      output: 'pretty',
+    });
+
+    return {
+      stderr: '',
+      stdout: typeof stdout === 'string' ? stdout : JSON.stringify(stdout, null, 2),
+    };
+  } catch (error) {
+    const jqError = error as {
+      code?: number | string;
+      message?: string;
+      stderr?: string;
+      stdout?: string;
+    };
+
+    return {
+      exitCode: typeof jqError.code === 'number' ? jqError.code : undefined,
+      stderr: jqError.stderr || jqError.message || 'jq execution failed',
+      stdout: jqError.stdout || '',
+    };
+  }
+}
+
+function getJqErrorHint(filter: string, errorMessage: string): string | null {
+  if (errorMessage.includes('cannot be negated')) {
+    return `A numeric field in the filter is null. Use a default value, for example \`${filter.replace(/-\s*\.quote/g, '-(.quote // 0)').replace(/\(\.quote\s*\|\|\s*0\)/g, '(.quote // 0)')}\` or explicitly write \`(.quote // 0)\`.`;
   }
 
-  // Handle items[0:N] pattern (slice only)
-  const sliceMatch = path.match(/^items\[(\d+):(\d+)\]$/);
-  if (sliceMatch && sliceMatch[1] && sliceMatch[2]) {
-    const start = parseInt(sliceMatch[1], 10);
-    const end = parseInt(sliceMatch[2], 10);
-    if (Array.isArray(obj?.items)) {
-      return obj.items.slice(start, end);
-    }
+  if (errorMessage.includes('Cannot iterate over null')) {
+    return 'Part of the filter is iterating over a null value. Guard it with `// []` for arrays or `// 0` for numbers.';
   }
 
-  // Handle items[N].field pattern (single index + field)
-  const indexFieldMatch = path.match(/^items\[(\d+)\]\.(\S+)$/);
-  if (indexFieldMatch && indexFieldMatch[1] && indexFieldMatch[2]) {
-    const index = parseInt(indexFieldMatch[1], 10);
-    const field = indexFieldMatch[2];
-    if (Array.isArray(obj?.items)) {
-      const items = obj.items as Record<string, unknown>[];
-      const item = items[index];
-      if (item && typeof item === 'object') {
-        return item[field];
-      }
-    }
+  if (errorMessage.includes('is not defined')) {
+    return 'The filter is referencing a field without jq root access. Use `.items`, `.pagination`, or `.[0]` instead of bare identifiers when needed.';
   }
 
-  // Handle items[N] pattern (single index)
-  const indexMatch = path.match(/^items\[(\d+)\]$/);
-  if (indexMatch && indexMatch[1]) {
-    const index = parseInt(indexMatch[1], 10);
-    if (Array.isArray(obj?.items)) {
-      return obj.items[index];
-    }
-  }
-
-  // Handle simple field access (top-level)
-  if (path && !path.includes('[')) {
-    const dataObj = data as Record<string, unknown>;
-    if (path.includes('.')) {
-      // Handle nested field like pagination.has_more
-      return path.split('.').reduce((acc: unknown, key: string) => {
-        if (acc && typeof acc === 'object') {
-          return (acc as Record<string, unknown>)[key];
-        }
-        return undefined;
-      }, dataObj);
-    }
-    return dataObj?.[path];
-  }
-
-  throw new Error(`Unsupported path format: ${path}`);
+  return null;
 }

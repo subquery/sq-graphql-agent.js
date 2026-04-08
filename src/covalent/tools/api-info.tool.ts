@@ -4,49 +4,75 @@
 import {DynamicStructuredTool} from '@langchain/core/tools';
 import type {Logger} from 'pino';
 import {z} from 'zod';
-import {getCovalentApiSpec} from '../api-spec.js';
+import {getInitialApiInfo, getCategoryDoc} from '../api-spec.js';
 
 /**
  * Create the Covalent API Info tool
  *
  * Returns the REST API specification for Covalent endpoints.
- * The agent should call this once at the start to understand available endpoints.
+ * Call with category parameter to get specific endpoint documentation.
  */
 export function createCovalentApiInfoTool(logger?: Logger): DynamicStructuredTool {
+  const schema = z.object({
+    category: z
+      .enum(['workflows', 'balances', 'transactions', 'nft-security-crosschain', 'utility'])
+      .optional()
+      .describe(
+        'Optional category to get detailed docs. Options: workflows, balances, transactions, nft-security-crosschain, utility. Leave empty for overview.'
+      ),
+  });
+
   return new DynamicStructuredTool({
     name: 'covalent_api_info',
-    description: `Get the Covalent REST API specification with available endpoints and parameters.
+    description: `Get the Covalent REST API documentation.
 
-    Use this tool ONCE at the start to understand the available endpoints,
-    their parameters, and response formats.
+    FIRST CALL (no category): Returns overview, chain names, common workflows, and available categories.
+    SUBSEQUENT CALLS (with category): Returns detailed endpoint docs for that category while keeping the shared workflows reference in context.
 
-    DO NOT call this tool multiple times. The API spec contains everything needed.`,
-    schema: z.object({}),
+    Categories:
+    - "workflows" - Common usage patterns (DEFAULT if no category)
+    - "balances" - Token balances, transfers, holders, portfolio
+    - "transactions" - Transaction history, blocks, summaries
+    - "nft-security-crosschain" - NFTs, approvals, multi-chain activity
+    - "utility" - Pricing, gas, events, chains status
+
+    Usage:
+    1. Call without category to understand available endpoints and workflows
+    2. Call with specific category if you need detailed endpoint parameters`,
+    schema,
     // eslint-disable-next-line @typescript-eslint/require-await
-    func: async () => {
+    func: async (input: z.infer<typeof schema>) => {
       try {
-        logger?.info('Executing Covalent API info tool');
+        const {category} = input;
+        logger?.info({category}, 'Executing Covalent API info tool');
 
-        const apiSpec = getCovalentApiSpec();
-        logger?.info({specLength: apiSpec.length}, 'Successfully returned API spec');
+        if (category) {
+          const doc = getCategoryDoc(category);
+          logger?.info({category, docLength: doc.length}, 'Returned category documentation');
+          return `📖 ${category.toUpperCase()} DOCUMENTATION:
 
-        return `📖 COVALENT REST API SPECIFICATION:
+${doc}
 
-${apiSpec}
+💡 This includes the shared workflows reference plus the detailed documentation for "${category}".
+   Call with another category if needed, or use covalent_query to make requests.`;
+        }
 
-💡 NOW USE THE SPECIFICATION ABOVE TO:
-1. Choose the appropriate endpoint category (balances, transactions, nfts, etc.)
-2. Construct the REST path with correct chain_name and wallet address
-3. Add query parameters as needed (quote-currency, page-size, etc.)
-4. Use covalent_query tool to execute the request
+        const initialInfo = getInitialApiInfo();
+        logger?.info({docLength: initialInfo.length}, 'Returned initial API info');
+
+        return `📖 COVALENT API OVERVIEW:
+
+${initialInfo}
 
 ⚠️ CRITICAL REMINDERS:
-- Chain names are case-sensitive: "eth-mainnet" not "ethereum"
+- Chain names are CASE-SENSITIVE: "eth-mainnet" not "ethereum"
 - ENS names are supported for eth-mainnet (e.g., vitalik.eth)
 - Balance values need division by 10^contract_decimals for display
 - Page numbers are 0-indexed (first page is 0)
 
-DO NOT call covalent_api_info again - everything needed is above.`;
+🚀 NEXT STEPS:
+1. If you need more endpoint details, call with category (e.g., "balances", "transactions")
+2. When ready, use covalent_query to execute requests`;
       } catch (error) {
         logger?.error(error, 'Error executing API info tool');
         return `Error reading API spec: ${error instanceof Error ? error.message : String(error)}`;

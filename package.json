@@ -59,6 +59,7 @@
     "@langchain/langgraph": "^0.4.9",
     "@langchain/openai": "^0.6.12",
     "graphql": "^16.11.0",
+    "node-jq": "^6.3.1",
     "openai": "^5.16.0",
     "pino": "^10.0.0",
     "yaml": "^2.8.2",
