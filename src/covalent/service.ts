@@ -53,7 +53,7 @@ export class CovalentService {
    */
   async execute(path: string, params?: Record<string, string | number | boolean>): Promise<CovalentResponse> {
     const baseUrl = this.config.baseUrl || 'https://api.covalenthq.com';
-    const url = new URL(path, baseUrl);
+    const url = resolveCovalentUrl(path, baseUrl);
 
     // Add query parameters
     if (params) {
@@ -101,6 +101,22 @@ export class CovalentService {
           if (covalentResult.error_message !== undefined) {
             errorResponse.error_message = covalentResult.error_message;
           }
+          if (covalentResult.error_code !== undefined) {
+            errorResponse.error_code = covalentResult.error_code;
+          }
+          return errorResponse;
+        }
+
+        if (covalentResult.data === null || covalentResult.data === undefined) {
+          this.logger?.warn(
+            {error: covalentResult.error_message || 'Missing data in Covalent response'},
+            'Covalent API returned success without data'
+          );
+          const errorResponse: CovalentResponse = {
+            data: null,
+            error: true,
+            error_message: 'Missing data in Covalent response',
+          };
           if (covalentResult.error_code !== undefined) {
             errorResponse.error_code = covalentResult.error_code;
           }

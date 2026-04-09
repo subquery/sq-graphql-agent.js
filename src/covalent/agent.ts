@@ -56,9 +56,6 @@ export function createCovalentAgent(
   agentConfig: CovalentAgentConfig,
   logger?: Logger
 ): CovalentAgent {
-  // Create per-session context
-  const context = new CovalentContext();
-
   // Create LLM instance
   const llm = new ChatOpenAI({
     model: agentConfig.llm.model,
@@ -69,23 +66,22 @@ export function createCovalentAgent(
     },
   });
 
-  // Create Covalent tools with shared context
-  const tools = createCovalentTools(config, context, logger);
-
-  // Create React agent
-  const agent = createReactAgent({llm, tools}).withConfig({
-    recursionLimit: 30,
-  });
-
   return {
     async invoke(question: string): Promise<string> {
+      // Create per-invocation context so cached jq/head state is never shared across requests.
+      const context = new CovalentContext();
+      const tools = createCovalentTools(config, context, logger);
+      const agent = createReactAgent({llm, tools}).withConfig({
+        recursionLimit: 30,
+      });
+
       const systemPrompt = buildCovalentSystemPrompt(agentConfig);
       const messages = [new SystemMessage(systemPrompt), new HumanMessage(question)];
 
       try {
-        logger?.debug({question: question.slice(0, 100)}, 'Starting agent invocation');
+        logger?.debug({questionLength: question.length}, 'Starting agent invocation');
         const result = await agent.invoke({messages});
-        logger?.debug({hasMessages: !!result?.messages}, 'Agent invocation completed');
+        logger?.debug({hasMessages: !!result?.messages, questionLength: question.length}, 'Agent invocation completed');
         const text = extractTextFromResult(result);
         return text || 'Agent completed without producing a final response.';
       } catch (error) {
