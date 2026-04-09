@@ -87,10 +87,15 @@ export function createCovalentAgent(
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         const errorStack = error instanceof Error ? error.stack : undefined;
-        const errorDetails =
-          error instanceof Error && 'response' in error
-            ? JSON.stringify((error as Record<string, unknown>).response, null, 2)
-            : undefined;
+        let errorDetails: string | undefined;
+        if (error instanceof Error && 'response' in error) {
+          const errorResponse = (error as Record<string, unknown>).response;
+          try {
+            errorDetails = JSON.stringify(errorResponse, null, 2);
+          } catch {
+            errorDetails = errorResponse !== undefined ? String(errorResponse) : '[unserializable error response]';
+          }
+        }
 
         logger?.error(
           {
