@@ -4,6 +4,7 @@
 import type {Logger} from 'pino';
 import type {CovalentConfig} from './types.js';
 
+const ABSOLUTE_SCHEME_PATTERN = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;
 const FETCH_TIMEOUT_MS = 30000;
 
 async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
@@ -21,6 +22,25 @@ interface CovalentResponse {
   error: boolean;
   error_message?: string | undefined;
   error_code?: number | undefined;
+}
+
+function resolveCovalentUrl(path: string, baseUrl: string): URL {
+  if (path.startsWith('//')) {
+    throw new Error('Protocol-relative URLs are not allowed');
+  }
+
+  if (ABSOLUTE_SCHEME_PATTERN.test(path)) {
+    throw new Error('Absolute URLs are not allowed');
+  }
+
+  const base = new URL(baseUrl);
+  const resolvedUrl = new URL(path, base);
+
+  if (resolvedUrl.origin !== base.origin) {
+    throw new Error('Cross-origin requests are not allowed');
+  }
+
+  return resolvedUrl;
 }
 
 /**
