@@ -12,6 +12,7 @@ import {CovalentService} from '../service.js';
 import type {CovalentConfig} from '../types.js';
 
 const require = createRequire(import.meta.url);
+const MAX_RESPONSE_BYTES = 100 * 1024;
 const JQ_BUILTINS = new Set([
   'add',
   'all',
@@ -346,19 +347,36 @@ Call covalent_result_head again and adjust the filter to match the saved payload
           'Tool completed'
         );
 
-        // Warn if result is very large (could cause LLM issues)
-        if (resultSize > 100 * 1024) {
+        let returnedContent = formatted;
+        let truncationNotice = '';
+
+        if (resultSize > MAX_RESPONSE_BYTES) {
+          let truncatedContent = formatted;
+
+          while (Buffer.byteLength(truncatedContent, 'utf-8') > MAX_RESPONSE_BYTES) {
+            truncatedContent = truncatedContent.slice(0, Math.max(0, truncatedContent.length - 1024));
+          }
+
+          returnedContent = truncatedContent;
+          truncationNotice = `⚠️ Output truncated: ${Math.round(resultSize / 1024)}KB total, returning first ${Math.round(Buffer.byteLength(returnedContent, 'utf-8') / 1024)}KB.\nUse a narrower jq filter such as \`.items[0:20]\`, \`.items | length\`, or a specific field projection.`;
+
           logger?.warn(
-            {resultSizeKB: Math.round(resultSize / 1024)},
-            'JQ result is large, may cause LLM context issues'
+            {
+              resultId: result.id,
+              path,
+              normalizedPath,
+              resultSizeKB: Math.round(resultSize / 1024),
+              returnedSizeKB: Math.round(Buffer.byteLength(returnedContent, 'utf-8') / 1024),
+            },
+            'JQ result was truncated to keep model context safe'
           );
         }
 
         return `📊 Extracted from ${result.id}:
 
-${formatted}
+${returnedContent}
 
-${executionTime > 3000 ? `⚠️ Slow jq query: ${executionTime}ms. Avoid repeated jq calls and prefer one final extraction pass.` : ''}`;
+${truncationNotice ? `${truncationNotice}\n\n` : ''}${executionTime > 3000 ? `⚠️ Slow jq query: ${executionTime}ms. Avoid repeated jq calls and prefer one final extraction pass.` : ''}`;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message.trim() : String(error);
         const hint = getJqErrorHint(normalizedPath, errorMessage);

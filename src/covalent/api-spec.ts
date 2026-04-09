@@ -7,6 +7,17 @@ import transactionsReference from './references/endpoints-transactions.js';
 import utilityReference from './references/endpoints-utility.js';
 import workflowsReference from './references/workflows.js';
 
+const CATEGORY_MAP: Record<string, {content: string; title: string}> = {
+  workflows: {content: workflowsReference, title: 'Common Workflows'},
+  balances: {content: balancesReference, title: 'Balance Endpoints'},
+  transactions: {content: transactionsReference, title: 'Transaction Endpoints'},
+  'nft-security-crosschain': {
+    content: nftSecurityCrosschainReference,
+    title: 'NFT, Security & Cross-Chain Endpoints',
+  },
+  utility: {content: utilityReference, title: 'Utility Endpoints'},
+};
+
 function getWorkflowsDoc(): string {
   return workflowsReference;
 }
@@ -73,26 +84,16 @@ export function getChainNamesRef(): string {
  * Get category-specific documentation
  */
 export function getCategoryDoc(category: string): string {
-  const categoryMap: Record<string, {content: string; title: string}> = {
-    workflows: {content: workflowsReference, title: 'Common Workflows'},
-    balances: {content: balancesReference, title: 'Balance Endpoints'},
-    transactions: {content: transactionsReference, title: 'Transaction Endpoints'},
-    'nft-security-crosschain': {
-      content: nftSecurityCrosschainReference,
-      title: 'NFT, Security & Cross-Chain Endpoints',
-    },
-    utility: {content: utilityReference, title: 'Utility Endpoints'},
-  };
-
-  const mapping = categoryMap[category.toLowerCase()];
+  const normalizedCategory = category.trim().toLowerCase();
+  const mapping = CATEGORY_MAP[normalizedCategory];
   if (!mapping) {
-    return `Unknown category: ${category}. Available: ${Object.keys(categoryMap).join(', ')}`;
+    return `Unknown category: ${category}. Available: ${Object.keys(CATEGORY_MAP).join(', ')}`;
   }
 
   const workflows = getWorkflowsDoc();
   const content = mapping.content;
 
-  if (category.toLowerCase() === 'workflows') {
+  if (normalizedCategory === 'workflows') {
     return `# ${mapping.title}
 
 ${content}`;
