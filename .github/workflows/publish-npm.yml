@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: publish-npm-${{ github.ref }}
@@ -52,30 +53,18 @@ jobs:
       - name: Build package
         run: pnpm build
 
-      - name: Configure npm auth
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          npm config set registry https://registry.npmjs.org/
-          npm config set //registry.npmjs.org/:_authToken "$NODE_AUTH_TOKEN"
-
       - name: Diagnose npm publish context
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           echo "Git ref: $GITHUB_REF"
           echo "Git ref name: $GITHUB_REF_NAME"
           echo "Package name: $(node -p 'require("./package.json").name')"
           echo "Package version: $(node -p 'require("./package.json").version')"
           echo "npm registry: $(npm config get registry)"
+          echo "Trusted publishing mode: GitHub OIDC"
           echo "npm ping:"
           npm ping || true
-          echo "npm whoami:"
-          npm whoami || true
           echo "npm view package:"
           npm view "$(node -p 'require("./package.json").name')" version || true
 
       - name: Publish package
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
+        run: npm publish --access public --provenance
