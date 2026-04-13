@@ -64,7 +64,7 @@ jobs:
           echo "npm view package:"
 
       - name: Publish package
-        uses: JS-DevTools/npm-publish@v3
+        uses: JS-DevTools/npm-publish@v1
         with:
           token: ${{ secrets.NPM_TOKEN }}
           access: public
