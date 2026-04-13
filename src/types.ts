@@ -6,7 +6,18 @@ import type {Logger} from 'pino';
 
 export type GraphQLAgent = {
   invoke: (question: string) => Promise<string>;
+  stream: (
+    question: string,
+    options?: GraphQLAgentStreamOptions
+  ) => Promise<AsyncIterable<GraphQLAgentStreamChunk>>;
 };
+
+export type GraphQLAgentStreamOptions = {
+  streamMode?: string | string[];
+  recursionLimit?: number;
+};
+
+export type GraphQLAgentStreamChunk = unknown;
 
 export enum GraphqlProvider {
   SUBQL = 'subql',

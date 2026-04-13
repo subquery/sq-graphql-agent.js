@@ -13,6 +13,8 @@ import {createGraphQLTools} from './tools/index.js';
 import {
   type GraphQLAgent,
   type GraphQLAgentConfig,
+  type GraphQLAgentStreamChunk,
+  type GraphQLAgentStreamOptions,
   type GraphQLProjectConfig,
   type PersistentService,
 } from './types.js';
@@ -37,15 +39,32 @@ export function createGraphQLAgent(
     recursionLimit: 30,
   });
 
+  const buildMessages = (question: string): BaseMessage[] => {
+    const systemPrompt = buildSystemPrompt(project, agentConfig.verbose);
+    return [new SystemMessage(systemPrompt), new HumanMessage(question)];
+  };
+
   return {
     async invoke(question: string): Promise<string> {
-      const systemPrompt = buildSystemPrompt(project, agentConfig.verbose);
-      const messages = [new SystemMessage(systemPrompt), new HumanMessage(question)];
-
-      const result = await agent.invoke({messages});
+      const result = await agent.invoke({messages: buildMessages(question)});
       const text = extractText(result);
 
       return text || 'Agent completed without producing a final response.';
+    },
+    async stream(
+      question: string,
+      options?: GraphQLAgentStreamOptions
+    ): Promise<AsyncIterable<GraphQLAgentStreamChunk>> {
+      const streamMode = options?.streamMode ?? 'updates';
+      const recursionLimit = options?.recursionLimit ?? 30;
+
+      return agent.stream(
+        {messages: buildMessages(question)},
+        {
+          streamMode: streamMode as any,
+          recursionLimit,
+        }
+      ) as Promise<AsyncIterable<GraphQLAgentStreamChunk>>;
     },
   };
 }
