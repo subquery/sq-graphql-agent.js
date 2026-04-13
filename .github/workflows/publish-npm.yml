@@ -31,9 +31,9 @@ jobs:
           version: 10
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
@@ -59,6 +59,9 @@ jobs:
           echo "Git ref name: $GITHUB_REF_NAME"
           echo "Package name: $(node -p 'require("./package.json").name')"
           echo "Package version: $(node -p 'require("./package.json").version')"
+          echo "Repository URL: $(node -p 'require("./package.json").repository?.url || "<missing>"')"
+          echo "Node version: $(node --version)"
+          echo "npm version: $(npm --version)"
           echo "npm registry: $(npm config get registry)"
           echo "Trusted publishing mode: GitHub OIDC"
           echo "npm ping:"
