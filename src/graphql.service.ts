@@ -156,6 +156,22 @@ async function secureFetch(
   return undefined;
 }
 
+type MetadataDeploymentsResponse = {
+  data?: {
+    _metadata?: {
+      deployments?: Record<string, string>;
+    };
+  };
+};
+
+type MetaDeploymentResponse = {
+  data?: {
+    _meta?: {
+      deployment?: string;
+    };
+  };
+};
+
 export class GraphQLService {
   private schemaCache = new Map<string, GraphQLSchema>();
 
@@ -288,7 +304,7 @@ export class GraphQLService {
       let cid: string | undefined;
 
       try {
-        const response1 = await secureFetch(
+        const response1 = (await secureFetch(
           endpoint,
           {
             query: `{
@@ -304,9 +320,9 @@ export class GraphQLService {
             maxContentLength: 10 * 1024 * 1024,
             validateRedirect: (url) => this.validateEndpointSecurity(url),
           }
-        );
+        )) as MetadataDeploymentsResponse;
 
-        const deployments = response1?.data?._metadata?.deployments as Record<string, string> | undefined;
+        const deployments = response1.data?._metadata?.deployments;
         cid = deployments ? Object.values(deployments).pop() : undefined;
 
         if (cid) {
@@ -321,7 +337,7 @@ export class GraphQLService {
       // 6. If the first method fails, try second method: _meta.deployment
       if (!cid) {
         try {
-          const response2 = await secureFetch(
+          const response2 = (await secureFetch(
             endpoint,
             {
               query: `{
@@ -337,9 +353,9 @@ export class GraphQLService {
               maxContentLength: 10 * 1024 * 1024,
               validateRedirect: (url) => this.validateEndpointSecurity(url),
             }
-          );
+          )) as MetaDeploymentResponse;
 
-          cid = response2?.data?._meta?.deployment as string | undefined;
+          cid = response2.data?._meta?.deployment;
 
           if (cid) {
             this.logger?.info(`Successfully fetched CID from _meta.deployment: ${cid}`);
