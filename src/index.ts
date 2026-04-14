@@ -20,6 +20,13 @@ import {
 } from './types.js';
 import {getHeader, isCodexEndpoint} from './utils.js';
 
+// Re-export types
+export type {GraphQLAgent, GraphQLAgentConfig, GraphQLProjectConfig, PersistentService} from './types.js';
+
+// Re-export Covalent agent
+export {createCovalentAgent} from './covalent/index.js';
+export type {CovalentAgent, CovalentAgentConfig, CovalentConfig} from './covalent/types.js';
+
 export function createGraphQLAgent(
   project: GraphQLProjectConfig,
   agentConfig: GraphQLAgentConfig,
