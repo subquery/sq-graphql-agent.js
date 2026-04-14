@@ -30,7 +30,12 @@ class LoggerMock {
   // Method to collect logs
   collect(level: string, msg: string, obj?: any, time?: string) {
     if (this.enabled) {
-      this.logs.push({level, msg, obj, time});
+      this.logs.push({
+        level,
+        msg,
+        ...(obj === undefined ? {} : {obj}),
+        ...(time === undefined ? {} : {time}),
+      });
 
       // Also print to console for test visibility
       const timestamp = time || new Date().toISOString();
@@ -418,8 +423,8 @@ describe('GraphQL Agent E2E Tests', () => {
     const llmConfig: GraphQLAgentConfig['llm'] = {
       model: process.env.LLM_MODEL || 'gpt-4o-mini',
       apiKey: process.env.OPENAI_API_KEY!,
-      baseUrl: process.env.OPENAI_API_BASE,
       temperature: 0,
+      ...(process.env.OPENAI_API_BASE ? {baseUrl: process.env.OPENAI_API_BASE} : {}),
     };
 
     console.log('Creating GraphQL agent with verbose=2...');
@@ -448,7 +453,7 @@ describe('GraphQL Agent E2E Tests', () => {
 
     // Check if response includes execution details
     // Note: The LLM may not always follow verbose instructions strictly
-    const verbose = 2; // This is the verbose level we set for this test
+    const verbose: number = 2; // This is the verbose level we set for this test
     if (verbose === 1) {
       // For verbose=1, check if response mentions queries (optional)
       const hasQuery = response.includes('query(') || response.includes('GraphQL');
@@ -492,8 +497,6 @@ describe('GraphQL Agent E2E Tests', () => {
       domainCapabilities: ['Test queries'],
       declineMessage: 'Cannot process',
       schemaContent: 'type Query { hello: String }',
-      authorization: undefined,
-      introspectionSchema: undefined,
     };
 
     // Test verbose = 0 (default)
