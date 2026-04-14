@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: PolyForm-Shield-1.0.0
 
 import type {Logger} from 'pino';
+import type {GraphQLAgentStreamChunk, GraphQLAgentStreamOptions} from '../types.js';
 
 /**
  * Configuration for the Covalent (GoldRush) REST API agent
@@ -30,4 +31,5 @@ export interface CovalentConfig {
  */
 export interface CovalentAgent {
   invoke: (question: string) => Promise<string>;
+  stream: (question: string, options?: GraphQLAgentStreamOptions) => Promise<AsyncIterable<GraphQLAgentStreamChunk>>;
 }

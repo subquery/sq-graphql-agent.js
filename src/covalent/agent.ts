@@ -5,6 +5,7 @@ import {BaseMessage, HumanMessage, isAIMessage, SystemMessage} from '@langchain/
 import {createReactAgent} from '@langchain/langgraph/prebuilt';
 import {ChatOpenAI} from '@langchain/openai';
 import type {Logger} from 'pino';
+import type {GraphQLAgentStreamChunk, GraphQLAgentStreamOptions} from '../types.js';
 import {CovalentContext} from './context.js';
 import {buildCovalentSystemPrompt} from './prompts.js';
 import {createCovalentTools} from './tools/index.js';
@@ -49,7 +50,7 @@ function extractTextFromResult(result: AgentResult): string | null {
  * @param config - Covalent API configuration (baseUrl, authorization)
  * @param agentConfig - Agent configuration (LLM settings, verbosity)
  * @param logger - Optional logger instance
- * @returns CovalentAgent with invoke() method
+ * @returns CovalentAgent with invoke() and stream() methods
  */
 export function createCovalentAgent(
   config: CovalentConfig,
@@ -66,6 +67,11 @@ export function createCovalentAgent(
     },
   });
 
+  const buildMessages = (question: string): BaseMessage[] => {
+    const systemPrompt = buildCovalentSystemPrompt(agentConfig);
+    return [new SystemMessage(systemPrompt), new HumanMessage(question)];
+  };
+
   return {
     async invoke(question: string): Promise<string> {
       // Create per-invocation context so cached jq/head state is never shared across requests.
@@ -75,8 +81,7 @@ export function createCovalentAgent(
         recursionLimit: 30,
       });
 
-      const systemPrompt = buildCovalentSystemPrompt(agentConfig);
-      const messages = [new SystemMessage(systemPrompt), new HumanMessage(question)];
+      const messages = buildMessages(question);
 
       try {
         logger?.debug({questionLength: question.length}, 'Starting agent invocation');
@@ -108,6 +113,29 @@ export function createCovalentAgent(
 
         throw error;
       }
+    },
+    async stream(
+      question: string,
+      options?: GraphQLAgentStreamOptions
+    ): Promise<AsyncIterable<GraphQLAgentStreamChunk>> {
+      // Create per-invocation context so cached jq/head state is never shared across requests.
+      const context = new CovalentContext();
+      const tools = createCovalentTools(config, context, logger);
+      const agent = createReactAgent({llm, tools}).withConfig({
+        recursionLimit: 30,
+      });
+      const streamMode = options?.streamMode ?? 'updates';
+      const recursionLimit = options?.recursionLimit ?? 30;
+
+      logger?.debug({questionLength: question.length, recursionLimit, streamMode}, 'Starting agent stream');
+
+      return agent.stream(
+        {messages: buildMessages(question)},
+        {
+          streamMode: streamMode as any,
+          recursionLimit,
+        }
+      ) as Promise<AsyncIterable<GraphQLAgentStreamChunk>>;
     },
   };
 }
