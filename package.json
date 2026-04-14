@@ -1,6 +1,6 @@
 {
   "name": "@subql/sq-graphql-agent",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "GraphQL agent for SubQuery Network",
   "repository": {
     "type": "git",
