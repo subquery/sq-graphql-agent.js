@@ -13,6 +13,9 @@ import type {CovalentConfig} from '../types.js';
 
 const require = createRequire(import.meta.url);
 const MAX_RESPONSE_BYTES = 100 * 1024;
+
+type JsonValue = string | number | boolean | null | {[key: string]: JsonValue} | JsonValue[];
+
 const JQ_BUILTINS = new Set([
   'add',
   'all',
@@ -191,7 +194,7 @@ export function createCovalentResultHeadTool(context: CovalentContext, logger?: 
     - The first N lines of the saved payload text
     - A truncated preview that helps you choose the jq path`,
     schema,
-    func: (input: z.infer<typeof schema>) => {
+    func: async (input: z.infer<typeof schema>) => {
       const {count} = input;
       logger?.info({tool: 'covalent_result_head', input: {count}}, 'Tool invoked');
 
@@ -434,6 +437,22 @@ type JqRunResult = {
   stdout: string;
 };
 
+function toJqInput(input: unknown): string[] | JsonValue {
+  if (input === null || typeof input === 'string' || typeof input === 'number' || typeof input === 'boolean') {
+    return input;
+  }
+
+  if (Array.isArray(input)) {
+    return input as JsonValue[];
+  }
+
+  if (typeof input === 'object') {
+    return input as {[key: string]: JsonValue};
+  }
+
+  throw new Error('Saved payload is not valid JSON input for jq');
+}
+
 function ensureNodeJqPath(): void {
   if (process.env.JQ_PATH) {
     return;
@@ -447,11 +466,11 @@ function ensureNodeJqPath(): void {
   }
 }
 
-async function runJqRawCli(input: object | string, filter: string): Promise<JqRunResult> {
+async function runJqRawCli(input: unknown, filter: string): Promise<JqRunResult> {
   try {
     ensureNodeJqPath();
     const jqModule = await import('node-jq');
-    const stdout = await jqModule.run(filter, input, {
+    const stdout = await jqModule.run(filter, toJqInput(input), {
       input: 'json',
       output: 'pretty',
     });
@@ -468,8 +487,10 @@ async function runJqRawCli(input: object | string, filter: string): Promise<JqRu
       stdout?: string;
     };
 
+    const exitCode = typeof jqError.code === 'number' ? jqError.code : undefined;
+
     return {
-      exitCode: typeof jqError.code === 'number' ? jqError.code : undefined,
+      ...(exitCode !== undefined ? {exitCode} : {}),
       stderr: jqError.stderr || jqError.message || 'jq execution failed',
       stdout: jqError.stdout || '',
     };
